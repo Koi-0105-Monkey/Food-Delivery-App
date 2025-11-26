@@ -12,6 +12,9 @@ export const appwriteConfig = {
     menuCollectionId: 'menu',
     customizationsCollectionId: 'customizations',
     menuCustomizationsCollectionId: 'menu_customizations',
+    // NEW: Collections for address and cart
+    userAddressesCollectionId: 'user_addresses',
+    cartItemsCollectionId: 'cart_items',
 };
 
 export const client = new Client();
@@ -26,11 +29,18 @@ export const databases = new Databases(client);
 export const storage = new Storage(client);
 const avatars = new Avatars(client);
 
+// Helper function to wait for session to be ready
+const waitForSession = (ms: number = 500) => 
+    new Promise(resolve => setTimeout(resolve, ms));
+
 export const createUser = async ({ email, password, name }: CreateUserParams) => {
     try {
         // Check if session exists and delete it
         try {
-            await account.deleteSession('current');
+            const sessions = await account.listSessions();
+            for (const session of sessions.sessions) {
+                await account.deleteSession(session.$id);
+            }
         } catch (e) {
             // No active session, continue
         }
@@ -47,8 +57,18 @@ export const createUser = async ({ email, password, name }: CreateUserParams) =>
             throw new Error('Failed to create account');
         }
 
+        console.log('✅ Account created:', newAccount.$id);
+
         // Sign in the new user
-        await signIn({ email, password });
+        const session = await account.createEmailPasswordSession(email, password);
+        console.log('✅ Session created:', session.$id);
+
+        // Wait for session to be fully established
+        await waitForSession();
+
+        // Verify session is active
+        const currentAccount = await account.get();
+        console.log('✅ Account verified:', currentAccount.email);
 
         // Create avatar
         const avatarUrl = avatars.getInitialsURL(name);
@@ -66,9 +86,11 @@ export const createUser = async ({ email, password, name }: CreateUserParams) =>
             }
         );
 
+        console.log('✅ User document created:', userDocument.$id);
+
         return userDocument;
     } catch (error: any) {
-        console.error('Create user error:', error);
+        console.error('❌ Create user error:', error);
 
         // Handle specific errors
         if (error.code === 409) {
@@ -89,7 +111,10 @@ export const signIn = async ({ email, password }: SignInParams) => {
     try {
         // Delete any existing session first
         try {
-            await account.deleteSession('current');
+            const sessions = await account.listSessions();
+            for (const session of sessions.sessions) {
+                await account.deleteSession(session.$id);
+            }
         } catch (e) {
             // No active session, continue
         }
@@ -101,9 +126,18 @@ export const signIn = async ({ email, password }: SignInParams) => {
             throw new Error('Failed to create session');
         }
 
+        console.log('✅ Session created:', session.$id);
+
+        // Wait for session to be fully established
+        await waitForSession();
+
+        // Verify session is active
+        const currentAccount = await account.get();
+        console.log('✅ Account verified:', currentAccount.email);
+
         return session;
     } catch (error: any) {
-        console.error('Sign in error:', error);
+        console.error('❌ Sign in error:', error);
 
         // Handle specific errors
         if (error.code === 401) {
@@ -122,12 +156,17 @@ export const signIn = async ({ email, password }: SignInParams) => {
 
 export const getCurrentUser = async () => {
     try {
+        // First verify we have an active session
         const currentAccount = await account.get();
 
         if (!currentAccount) {
-            throw new Error('No active session');
+            console.log('❌ No account found');
+            return null;
         }
 
+        console.log('✅ Account found:', currentAccount.email);
+
+        // Then get user document
         const currentUser = await databases.listDocuments(
             appwriteConfig.databaseId,
             appwriteConfig.userCollectionId,
@@ -135,19 +174,21 @@ export const getCurrentUser = async () => {
         );
 
         if (!currentUser || currentUser.documents.length === 0) {
-            throw new Error('User document not found');
-        }
-
-        return currentUser.documents[0];
-    } catch (error: any) {
-        console.error('Get current user error:', error);
-        
-        // If session expired or invalid, return null (not an error)
-        if (error.code === 401 || error.message?.includes('session')) {
+            console.log('❌ User document not found');
             return null;
         }
 
-        throw new Error(error.message || 'Failed to get current user');
+        console.log('✅ User document found:', currentUser.documents[0].email);
+        return currentUser.documents[0];
+    } catch (error: any) {
+        console.error('❌ Get current user error:', error.message);
+        
+        // If session expired or invalid, return null (not an error)
+        if (error.code === 401 || error.message?.includes('session') || error.message?.includes('guests')) {
+            return null;
+        }
+
+        return null;
     }
 };
 
@@ -182,5 +223,166 @@ export const getCategories = async () => {
     } catch (error: any) {
         console.error('Get categories error:', error);
         throw new Error(error.message || 'Failed to fetch categories');
+    }
+};
+
+// ========== ADDRESS FUNCTIONS ==========
+
+export const saveUserAddress = async (userId: string, address: {
+    street: string;
+    city: string;
+    country: string;
+    fullAddress: string;
+    isDefault?: boolean;
+}) => {
+    try {
+        // Check if user already has an address
+        const existing = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.userAddressesCollectionId,
+            [Query.equal('user_id', userId)] // snake_case
+        );
+
+        // If exists, update. If not, create.
+        if (existing.documents.length > 0) {
+            const doc = await databases.updateDocument(
+                appwriteConfig.databaseId,
+                appwriteConfig.userAddressesCollectionId,
+                existing.documents[0].$id,
+                {
+                    street: address.street,
+                    city: address.city,
+                    country: address.country,
+                    full_address: address.fullAddress, // snake_case
+                    is_default: address.isDefault ?? true, // snake_case
+                }
+            );
+            return doc;
+        } else {
+            const doc = await databases.createDocument(
+                appwriteConfig.databaseId,
+                appwriteConfig.userAddressesCollectionId,
+                ID.unique(),
+                {
+                    user_id: userId, // snake_case
+                    street: address.street,
+                    city: address.city,
+                    country: address.country,
+                    full_address: address.fullAddress, // snake_case
+                    is_default: address.isDefault ?? true, // snake_case
+                }
+            );
+            return doc;
+        }
+    } catch (error: any) {
+        console.error('❌ Save address error:', error);
+        throw new Error(error.message || 'Failed to save address');
+    }
+};
+
+export const getUserAddress = async (userId: string) => {
+    try {
+        const addresses = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.userAddressesCollectionId,
+            [Query.equal('user_id', userId)] // snake_case
+        );
+
+        if (addresses.documents.length === 0) return null;
+
+        return addresses.documents[0];
+    } catch (error: any) {
+        console.error('❌ Get address error:', error);
+        return null;
+    }
+};
+
+// ========== CART FUNCTIONS ==========
+
+export const syncCartToServer = async (userId: string, cartItems: any[]) => {
+    try {
+        // Delete all existing cart items for this user
+        const existing = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.cartItemsCollectionId,
+            [Query.equal('user_id', userId)] // snake_case
+        );
+
+        for (const item of existing.documents) {
+            await databases.deleteDocument(
+                appwriteConfig.databaseId,
+                appwriteConfig.cartItemsCollectionId,
+                item.$id
+            );
+        }
+
+        // Create new cart items
+        const promises = cartItems.map((item) =>
+            databases.createDocument(
+                appwriteConfig.databaseId,
+                appwriteConfig.cartItemsCollectionId,
+                ID.unique(),
+                {
+                    user_id: userId, // snake_case
+                    menu_id: item.id, // snake_case
+                    name: item.name,
+                    price: item.price,
+                    image_url: item.image_url, // snake_case
+                    quantity: item.quantity,
+                    customizations: JSON.stringify(item.customizations || []),
+                }
+            )
+        );
+
+        await Promise.all(promises);
+        console.log('✅ Cart synced to server');
+    } catch (error: any) {
+        console.error('❌ Sync cart error:', error);
+        throw new Error(error.message || 'Failed to sync cart');
+    }
+};
+
+export const getCartFromServer = async (userId: string) => {
+    try {
+        const cartItems = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.cartItemsCollectionId,
+            [Query.equal('user_id', userId)] // snake_case
+        );
+
+        // Convert to cart format
+        return cartItems.documents.map((doc: any) => ({
+            id: doc.menu_id, // snake_case
+            name: doc.name,
+            price: doc.price,
+            image_url: doc.image_url, // snake_case
+            quantity: doc.quantity,
+            customizations: JSON.parse(doc.customizations || '[]'),
+        }));
+    } catch (error: any) {
+        console.error('❌ Get cart error:', error);
+        return [];
+    }
+};
+
+export const clearCartFromServer = async (userId: string) => {
+    try {
+        const existing = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.cartItemsCollectionId,
+            [Query.equal('user_id', userId)] // snake_case
+        );
+
+        for (const item of existing.documents) {
+            await databases.deleteDocument(
+                appwriteConfig.databaseId,
+                appwriteConfig.cartItemsCollectionId,
+                item.$id
+            );
+        }
+
+        console.log('✅ Cart cleared from server');
+    } catch (error: any) {
+        console.error('❌ Clear cart error:', error);
     }
 };
