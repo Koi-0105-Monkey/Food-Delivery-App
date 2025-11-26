@@ -1,33 +1,70 @@
-import {View, Text, Button, Alert} from 'react-native'
-import {Link, router} from "expo-router";
-import CustomInput from "@/components/CustomInput";
-import CustomButton from "@/components/CustomButton";
-import {useState} from "react";
-import {signIn} from "@/lib/appwrite";
-import * as Sentry from '@sentry/react-native'
+import { View, Text, Alert } from 'react-native';
+import { Link, router } from 'expo-router';
+import CustomInput from '@/components/CustomInput';
+import CustomButton from '@/components/CustomButton';
+import { useState } from 'react';
+import { signIn } from '@/lib/appwrite';
+import useAuthStore from '@/store/auth.store';
+import * as Sentry from '@sentry/react-native';
 
 const SignIn = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [form, setForm] = useState({ email: '', password: '' });
+    const { fetchAuthenticatedUser } = useAuthStore();
 
     const submit = async () => {
         const { email, password } = form;
 
-        if(!email || !password) return Alert.alert('Error', 'Please enter valid email address & password.');
+        // Validation
+        if (!email.trim() || !email.includes('@')) {
+            return Alert.alert('Error', 'Please enter a valid email address.');
+        }
 
-        setIsSubmitting(true)
+        if (!password || password.length < 8) {
+            return Alert.alert('Error', 'Please enter your password (minimum 8 characters).');
+        }
+
+        setIsSubmitting(true);
 
         try {
-            await signIn({ email, password });
+            console.log('🔐 Starting sign in...');
+            
+            // Sign in and wait for session to be established
+            await signIn({ 
+                email: email.trim().toLowerCase(), 
+                password 
+            });
 
-            router.replace('/');
-        } catch(error: any) {
-            Alert.alert('Error', error.message);
-            Sentry.captureEvent(error);
+            console.log('✅ Sign in successful, fetching user...');
+
+            // Fetch user data and update auth state
+            await fetchAuthenticatedUser();
+
+            console.log('✅ User fetched, redirecting to home...');
+
+            // Redirect to home với param để trigger modal
+            router.replace('/?showWelcome=signin');
+
+        } catch (error: any) {
+            console.error('❌ Sign in error:', error);
+            
+            // Better error messages
+            let errorMessage = 'Failed to sign in. Please check your credentials.';
+            
+            if (error.message?.includes('Invalid credentials')) {
+                errorMessage = 'Invalid email or password. Please try again.';
+            } else if (error.message?.includes('user_not_found')) {
+                errorMessage = 'No account found with this email. Please sign up first.';
+            } else if (error.message?.includes('user_blocked')) {
+                errorMessage = 'Your account has been blocked. Please contact support.';
+            }
+            
+            Alert.alert('Sign In Failed', errorMessage);
+            Sentry.captureException(error);
         } finally {
             setIsSubmitting(false);
         }
-    }
+    };
 
     return (
         <View className="gap-10 bg-white rounded-lg p-5 mt-5">
@@ -61,7 +98,7 @@ const SignIn = () => {
                 </Link>
             </View>
         </View>
-    )
-}
+    );
+};
 
-export default SignIn
+export default SignIn;
