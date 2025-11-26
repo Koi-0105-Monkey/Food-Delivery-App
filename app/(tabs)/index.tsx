@@ -6,20 +6,24 @@ import { useLocalSearchParams, router } from 'expo-router';
 
 import CartButton from '@/components/CartButton';
 import SuccessModal from '@/components/SuccessModal';
+import AddressModal from '@/components/AddressModal';
 import { images, offers } from '@/constants';
 import useAuthStore from '@/store/auth.store';
+import { useAddressStore } from '@/store/address.store';
 
 export default function Index() {
     const { user } = useAuthStore();
+    const { getDisplayAddress } = useAddressStore();
     const params = useLocalSearchParams<{ showWelcome?: string }>();
-    const [showModal, setShowModal] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [showAddressModal, setShowAddressModal] = useState(false);
 
     useEffect(() => {
         // Chỉ hiện modal khi sign in (không phải sign up)
         if (params.showWelcome === 'signin') {
             // Delay nhỏ để đảm bảo UI đã render
             setTimeout(() => {
-                setShowModal(true);
+                setShowSuccessModal(true);
             }, 300);
 
             // Clear param sau khi hiện modal
@@ -73,8 +77,13 @@ export default function Index() {
                     <View className="flex-between flex-row w-full my-5">
                         <View className="flex-start">
                             <Text className="small-bold text-primary">DELIVER TO</Text>
-                            <TouchableOpacity className="flex-center flex-row gap-x-1 mt-0.5">
-                                <Text className="paragraph-bold text-dark-100">Croatia</Text>
+                            <TouchableOpacity 
+                                className="flex-center flex-row gap-x-1 mt-0.5"
+                                onPress={() => setShowAddressModal(true)}
+                            >
+                                <Text className="paragraph-bold text-dark-100">
+                                    {getDisplayAddress()}
+                                </Text>
                                 <Image 
                                     source={images.arrowDown} 
                                     className="size-3" 
@@ -90,11 +99,17 @@ export default function Index() {
 
             {/* Success Modal - Chỉ cho Sign In */}
             <SuccessModal
-                visible={showModal}
-                onClose={() => setShowModal(false)}
+                visible={showSuccessModal}
+                onClose={() => setShowSuccessModal(false)}
                 title="Welcome Back! 🍕"
                 message="You're now signed in. Let's order some delicious food!"
                 type="signin"
+            />
+
+            {/* Address Modal */}
+            <AddressModal
+                visible={showAddressModal}
+                onClose={() => setShowAddressModal(false)}
             />
         </SafeAreaView>
     );
