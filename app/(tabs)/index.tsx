@@ -19,17 +19,14 @@ export default function Index() {
     const [showAddressModal, setShowAddressModal] = useState(false);
 
     useEffect(() => {
-        // Chỉ hiện modal khi sign in (không phải sign up)
-        if (params.showWelcome === 'signin') {
-            // Delay nhỏ để đảm bảo UI đã render
-            setTimeout(() => {
-                setShowSuccessModal(true);
-            }, 300);
-
-            // Clear param sau khi hiện modal
-            router.setParams({ showWelcome: undefined });
-        }
-    }, [params.showWelcome]);
+    if (params.showWelcome === 'signin') {
+        setTimeout(() => setShowSuccessModal(true), 300);
+        router.setParams({ showWelcome: undefined });
+    } else if (params.showWelcome === 'signup') {
+        setTimeout(() => setShowSuccessModal(true), 300);
+        router.setParams({ showWelcome: undefined });
+    }
+}, [params.showWelcome]);
 
     return (
         <SafeAreaView className="flex-1 bg-white">
@@ -104,6 +101,14 @@ export default function Index() {
                 title="Welcome Back! 🍕"
                 message="You're now signed in. Let's order some delicious food!"
                 type="signin"
+            />
+
+            <SuccessModal
+                visible={showSuccessModal}
+                onClose={() => setShowSuccessModal(false)}
+                title="Welcome Aboard! 🎉"
+                message="Your account has been created successfully. Get ready to explore delicious food options!"
+                type="signup"
             />
 
             {/* Address Modal */}
