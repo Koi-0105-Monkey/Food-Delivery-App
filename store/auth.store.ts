@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import {User} from "@/type";
-import {getCurrentUser} from "@/lib/appwrite";
+import { User } from '@/type';
+import { getCurrentUser } from '@/lib/appwrite';
 
 type AuthState = {
     isAuthenticated: boolean;
@@ -21,23 +21,38 @@ const useAuthStore = create<AuthState>((set) => ({
 
     setIsAuthenticated: (value) => set({ isAuthenticated: value }),
     setUser: (user) => set({ user }),
-    setLoading: (value) => set({isLoading: value}),
+    setLoading: (value) => set({ isLoading: value }),
 
     fetchAuthenticatedUser: async () => {
-        set({isLoading: true});
+        set({ isLoading: true });
 
         try {
             const user = await getCurrentUser();
 
-            if(user) set({ isAuthenticated: true, user: user as User })
-            else set( { isAuthenticated: false, user: null } );
+            if (user) {
+                set({ 
+                    isAuthenticated: true, 
+                    user: user as User,
+                    isLoading: false
+                });
+                console.log('✅ User authenticated:', user.email);
+            } else {
+                set({ 
+                    isAuthenticated: false, 
+                    user: null,
+                    isLoading: false 
+                });
+                console.log('❌ No user session found');
+            }
         } catch (e) {
-            console.log('fetchAuthenticatedUser error', e);
-            set({ isAuthenticated: false, user: null })
-        } finally {
-            set({ isLoading: false });
+            console.error('❌ fetchAuthenticatedUser error:', e);
+            set({ 
+                isAuthenticated: false, 
+                user: null,
+                isLoading: false 
+            });
         }
     }
-}))
+}));
 
 export default useAuthStore;
