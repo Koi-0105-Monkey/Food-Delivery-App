@@ -1,26 +1,48 @@
-import {Redirect, Slot, Tabs} from "expo-router";
-import useAuthStore from "@/store/auth.store";
-import {TabBarIconProps} from "@/type";
-import {Image, Text, View} from "react-native";
-import {images} from "@/constants";
-import cn from "clsx";
+import { Redirect, Tabs } from 'expo-router';
+import useAuthStore from '@/store/auth.store';
+import { TabBarIconProps } from '@/type';
+import { ActivityIndicator, Image, Text, View } from 'react-native';
+import { images } from '@/constants';
+import cn from 'clsx';
 
 const TabBarIcon = ({ focused, icon, title }: TabBarIconProps) => (
     <View className="tab-icon">
-        <Image source={icon} className="size-7" resizeMode="contain" tintColor={focused ? '#FE8C00' : '#5D5F6D'} />
-        <Text className={cn('text-sm font-bold', focused ? 'text-primary':'text-gray-200')}>
+        <Image 
+            source={icon} 
+            className="size-7" 
+            resizeMode="contain" 
+            tintColor={focused ? '#FE8C00' : '#5D5F6D'} 
+        />
+        <Text className={cn('text-sm font-bold', focused ? 'text-primary' : 'text-gray-200')}>
             {title}
         </Text>
     </View>
-)
+);
 
 export default function TabLayout() {
-    const { isAuthenticated } = useAuthStore();
+    const { isAuthenticated, isLoading } = useAuthStore();
 
-    if(!isAuthenticated) return <Redirect href="/sign-in" />
+    // Show loading spinner while checking auth
+    if (isLoading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
+                <ActivityIndicator size="large" color="#FE8C00" />
+                <Text style={{ marginTop: 10, color: '#878787' }}>Loading...</Text>
+            </View>
+        );
+    }
+
+    // Redirect to sign-in if not authenticated
+    if (!isAuthenticated) {
+        console.log('🔒 User not authenticated, redirecting to sign-in');
+        return <Redirect href="/sign-in" />;
+    }
+
+    console.log('✅ User authenticated, showing tabs');
 
     return (
-        <Tabs screenOptions={{
+        <Tabs
+            screenOptions={{
                 headerShown: false,
                 tabBarShowLabel: false,
                 tabBarStyle: {
@@ -37,35 +59,44 @@ export default function TabLayout() {
                     shadowOffset: { width: 0, height: 2 },
                     shadowOpacity: 0.1,
                     shadowRadius: 4,
-                    elevation: 5
-                }
-            }}>
+                    elevation: 5,
+                },
+            }}
+        >
             <Tabs.Screen
-                name='index'
+                name="index"
                 options={{
                     title: 'Home',
-                    tabBarIcon: ({ focused }) => <TabBarIcon title="Home" icon={images.home} focused={focused} />
+                    tabBarIcon: ({ focused }) => (
+                        <TabBarIcon title="Home" icon={images.home} focused={focused} />
+                    ),
                 }}
             />
             <Tabs.Screen
-                name='search'
+                name="search"
                 options={{
                     title: 'Search',
-                    tabBarIcon: ({ focused }) => <TabBarIcon title="Search" icon={images.search} focused={focused} />
+                    tabBarIcon: ({ focused }) => (
+                        <TabBarIcon title="Search" icon={images.search} focused={focused} />
+                    ),
                 }}
             />
             <Tabs.Screen
-                name='cart'
+                name="cart"
                 options={{
                     title: 'Cart',
-                    tabBarIcon: ({ focused }) => <TabBarIcon title="Cart" icon={images.bag} focused={focused} />
+                    tabBarIcon: ({ focused }) => (
+                        <TabBarIcon title="Cart" icon={images.bag} focused={focused} />
+                    ),
                 }}
             />
             <Tabs.Screen
-                name='profile'
+                name="profile"
                 options={{
                     title: 'Profile',
-                    tabBarIcon: ({ focused }) => <TabBarIcon title="Profile" icon={images.person} focused={focused} />
+                    tabBarIcon: ({ focused }) => (
+                        <TabBarIcon title="Profile" icon={images.person} focused={focused} />
+                    ),
                 }}
             />
         </Tabs>
