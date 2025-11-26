@@ -47,17 +47,6 @@ const SignUp = () => {
             // Fetch user data and update auth state
             await fetchAuthenticatedUser();
 
-            console.log('✅ User fetched, showing success modal');
-
-            // Show success modal
-            setShowSuccessModal(true);
-
-            // Auto close modal and redirect after 3 seconds
-            setTimeout(() => {
-                setShowSuccessModal(false);
-                router.replace('/');
-            }, 3000);
-
         } catch (error: any) {
             console.error('❌ Sign up error:', error);
             
@@ -118,17 +107,6 @@ const SignUp = () => {
                     </Link>
                 </View>
             </View>
-
-            <SuccessModal
-                visible={showSuccessModal}
-                onClose={() => {
-                    setShowSuccessModal(false);
-                    router.replace('/');
-                }}
-                title="Welcome Aboard! 🎉"
-                message="Your account has been created successfully. Get ready to explore delicious food options!"
-                type="signup"
-            />
         </>
     );
 };

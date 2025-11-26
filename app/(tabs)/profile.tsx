@@ -1,10 +1,12 @@
-import {View, Text, Image, ScrollView, TouchableOpacity, Alert} from 'react-native'
-import {SafeAreaView} from "react-native-safe-area-context";
-import useAuthStore from "@/store/auth.store";
-import {images} from "@/constants";
-import {router} from "expo-router";
-import {account} from "@/lib/appwrite";
-import {useState} from "react";
+import { View, Text, Image, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import useAuthStore from '@/store/auth.store';
+import { useAddressStore } from '@/store/address.store';
+import { images } from '@/constants';
+import { router } from 'expo-router';
+import { account } from '@/lib/appwrite';
+import { useState } from 'react';
+import AddressModal from '@/components/AddressModal';
 
 const ProfileField = ({ label, value, icon }: { label: string; value: string; icon: any }) => (
     <View className="profile-field">
@@ -20,20 +22,22 @@ const ProfileField = ({ label, value, icon }: { label: string; value: string; ic
 
 const Profile = () => {
     const { user, setIsAuthenticated, setUser } = useAuthStore();
+    const { address, getDisplayAddress } = useAddressStore();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [showAddressModal, setShowAddressModal] = useState(false);
 
     const handleLogout = async () => {
         Alert.alert(
-            "Logout",
-            "Are you sure you want to logout?",
+            'Logout',
+            'Are you sure you want to logout?',
             [
                 {
-                    text: "Cancel",
-                    style: "cancel"
+                    text: 'Cancel',
+                    style: 'cancel',
                 },
                 {
-                    text: "Logout",
-                    style: "destructive",
+                    text: 'Logout',
+                    style: 'destructive',
                     onPress: async () => {
                         setIsLoggingOut(true);
                         try {
@@ -46,10 +50,27 @@ const Profile = () => {
                         } finally {
                             setIsLoggingOut(false);
                         }
-                    }
-                }
+                    },
+                },
             ]
         );
+    };
+
+    const openGoogleMaps = () => {
+        if (!address?.fullAddress) {
+            return Alert.alert('No Address', 'Please set your delivery address first.');
+        }
+
+        // Encode địa chỉ để sử dụng trong URL
+        const encodedAddress = encodeURIComponent(address.fullAddress);
+        
+        // URL cho Google Maps
+        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+
+        // Mở Google Maps
+        Linking.openURL(mapsUrl).catch(() => {
+            Alert.alert('Error', 'Unable to open Google Maps');
+        });
     };
 
     return (
@@ -66,16 +87,16 @@ const Profile = () => {
                 {/* Avatar Section */}
                 <View className="flex-center mb-10">
                     <View className="profile-avatar">
-                        <Image 
-                            source={{ uri: user?.avatar || 'https://via.placeholder.com/150' }} 
-                            className="size-full rounded-full" 
-                            resizeMode="cover" 
+                        <Image
+                            source={{ uri: user?.avatar || 'https://via.placeholder.com/150' }}
+                            className="size-full rounded-full"
+                            resizeMode="cover"
                         />
                         <TouchableOpacity className="profile-edit">
-                            <Image 
-                                source={images.pencil} 
-                                className="size-3" 
-                                resizeMode="contain" 
+                            <Image
+                                source={images.pencil}
+                                className="size-3"
+                                resizeMode="contain"
                                 tintColor="#ffffff"
                             />
                         </TouchableOpacity>
@@ -87,74 +108,141 @@ const Profile = () => {
                 {/* Profile Information */}
                 <View className="mb-8">
                     <Text className="base-bold text-dark-100 mb-4">Personal Information</Text>
-                    
-                    <ProfileField 
-                        label="Full Name" 
-                        value={user?.name || 'Not provided'} 
-                        icon={images.user} 
+
+                    <ProfileField
+                        label="Full Name"
+                        value={user?.name || 'Not provided'}
+                        icon={images.user}
                     />
-                    
-                    <ProfileField 
-                        label="Email Address" 
-                        value={user?.email || 'Not provided'} 
-                        icon={images.envelope} 
+
+                    <ProfileField
+                        label="Email Address"
+                        value={user?.email || 'Not provided'}
+                        icon={images.envelope}
                     />
-                    
-                    <ProfileField 
-                        label="Phone Number" 
-                        value="+1 234 567 8900" 
-                        icon={images.phone} 
+
+                    <ProfileField
+                        label="Phone Number"
+                        value="+1 234 567 8900"
+                        icon={images.phone}
                     />
-                    
-                    <ProfileField 
-                        label="Address" 
-                        value="123 Main Street, City, Country" 
-                        icon={images.location} 
+
+                    <ProfileField
+                        label="Delivery Address"
+                        value={address?.fullAddress || 'Not set'}
+                        icon={images.location}
                     />
                 </View>
 
                 {/* Action Buttons */}
                 <View className="gap-4">
-                    <TouchableOpacity 
+                    {/* Update Address */}
+                    <TouchableOpacity
+                        className="bg-white border border-gray-200 rounded-2xl p-5 flex-row items-center justify-between"
+                        onPress={() => setShowAddressModal(true)}
+                    >
+                        <View className="flex-row items-center gap-3">
+                            <View className="size-12 rounded-full bg-primary/10 flex-center">
+                                <Image
+                                    source={images.location}
+                                    className="size-6"
+                                    resizeMode="contain"
+                                    tintColor="#FE8C00"
+                                />
+                            </View>
+                            <Text className="paragraph-semibold text-dark-100">
+                                Update Address
+                            </Text>
+                        </View>
+                        <Image source={images.arrowRight} className="size-5" resizeMode="contain" />
+                    </TouchableOpacity>
+
+                    {/* View on Google Maps */}
+                    {address && (
+                        <TouchableOpacity
+                            className="bg-white border border-gray-200 rounded-2xl p-5 flex-row items-center justify-between"
+                            onPress={openGoogleMaps}
+                        >
+                            <View className="flex-row items-center gap-3">
+                                <View className="size-12 rounded-full bg-success/10 flex-center">
+                                    <Image
+                                        source={images.location}
+                                        className="size-6"
+                                        resizeMode="contain"
+                                        tintColor="#2F9B65"
+                                    />
+                                </View>
+                                <Text className="paragraph-semibold text-dark-100">
+                                    View on Google Maps
+                                </Text>
+                            </View>
+                            <Image source={images.arrowRight} className="size-5" resizeMode="contain" />
+                        </TouchableOpacity>
+                    )}
+
+                    {/* Order History */}
+                    <TouchableOpacity
                         className="bg-white border border-gray-200 rounded-2xl p-5 flex-row items-center justify-between"
                         onPress={() => Alert.alert('Coming Soon', 'Order history feature coming soon!')}
                     >
                         <View className="flex-row items-center gap-3">
                             <View className="size-12 rounded-full bg-primary/10 flex-center">
-                                <Image source={images.clock} className="size-6" resizeMode="contain" tintColor="#FE8C00" />
+                                <Image
+                                    source={images.clock}
+                                    className="size-6"
+                                    resizeMode="contain"
+                                    tintColor="#FE8C00"
+                                />
                             </View>
                             <Text className="paragraph-semibold text-dark-100">Order History</Text>
                         </View>
                         <Image source={images.arrowRight} className="size-5" resizeMode="contain" />
                     </TouchableOpacity>
 
-                    <TouchableOpacity 
+                    {/* Edit Profile */}
+                    <TouchableOpacity
                         className="bg-white border border-gray-200 rounded-2xl p-5 flex-row items-center justify-between"
-                        onPress={() => Alert.alert('Coming Soon', 'Settings feature coming soon!')}
+                        onPress={() => Alert.alert('Coming Soon', 'Edit profile feature coming soon!')}
                     >
                         <View className="flex-row items-center gap-3">
                             <View className="size-12 rounded-full bg-primary/10 flex-center">
-                                <Image source={images.pencil} className="size-6" resizeMode="contain" tintColor="#FE8C00" />
+                                <Image
+                                    source={images.pencil}
+                                    className="size-6"
+                                    resizeMode="contain"
+                                    tintColor="#FE8C00"
+                                />
                             </View>
                             <Text className="paragraph-semibold text-dark-100">Edit Profile</Text>
                         </View>
                         <Image source={images.arrowRight} className="size-5" resizeMode="contain" />
                     </TouchableOpacity>
 
-                    <TouchableOpacity 
+                    {/* Logout */}
+                    <TouchableOpacity
                         className="bg-error/10 border border-error rounded-2xl p-5 flex-row items-center justify-between"
                         onPress={handleLogout}
                         disabled={isLoggingOut}
                     >
                         <View className="flex-row items-center gap-3">
                             <View className="size-12 rounded-full bg-error/20 flex-center">
-                                <Image source={images.logout} className="size-6" resizeMode="contain" tintColor="#F14141" />
+                                <Image
+                                    source={images.logout}
+                                    className="size-6"
+                                    resizeMode="contain"
+                                    tintColor="#F14141"
+                                />
                             </View>
                             <Text className="paragraph-semibold text-error">
                                 {isLoggingOut ? 'Logging out...' : 'Logout'}
                             </Text>
                         </View>
-                        <Image source={images.arrowRight} className="size-5" resizeMode="contain" tintColor="#F14141" />
+                        <Image
+                            source={images.arrowRight}
+                            className="size-5"
+                            resizeMode="contain"
+                            tintColor="#F14141"
+                        />
                     </TouchableOpacity>
                 </View>
 
@@ -164,8 +252,14 @@ const Profile = () => {
                     <Text className="small-bold text-gray-200 mt-1">Version 1.0.0</Text>
                 </View>
             </ScrollView>
-        </SafeAreaView>
-    )
-}
 
-export default Profile
+            {/* Address Modal */}
+            <AddressModal
+                visible={showAddressModal}
+                onClose={() => setShowAddressModal(false)}
+            />
+        </SafeAreaView>
+    );
+};
+
+export default Profile;
