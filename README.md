@@ -150,3 +150,8 @@ detailed explanations, cool features, and exercises to boost your skills. Give i
 <a href="https://jsm.dev/rn-food-jsm" target="_blank">
    <img src="assets/readme/jsmpro.png" alt="Project Banner">
 </a>
+
+
+
+branch : feature/edit-profile
+ add in terminal : npx expo install expo-image-picker
