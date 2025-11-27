@@ -150,3 +150,48 @@ detailed explanations, cool features, and exercises to boost your skills. Give i
 <a href="https://jsm.dev/rn-food-jsm" target="_blank">
    <img src="assets/readme/jsmpro.png" alt="Project Banner">
 </a>
+
+
+
+
+ 🔑 Cách lấy Google Maps API Key:
+Bước 1: Truy cập Google Cloud Console
+
+Vào https://console.cloud.google.com/
+Đăng nhập tài khoản Google
+
+Bước 2: Tạo Project
+
+Click "Select a project" → "New Project"
+Tên project: Food Delivery App
+Click "Create"
+
+Bước 3: Enable APIs
+
+Vào APIs & Services → Library
+Search và Enable các APIs sau:
+
+✅ Maps JavaScript API
+✅ Maps Embed API
+✅ Geocoding API
+✅ Places API
+
+
+
+Bước 4: Tạo API Key
+
+Vào APIs & Services → Credentials
+Click Create Credentials → API Key
+Copy API Key (dạng: AIzaSyC...)
+(Recommended) Click Restrict Key:
+
+Application restrictions: None (hoặc Android/iOS apps)
+API restrictions: Chọn các APIs đã enable ở trên
+
+
+
+Bước 5: Thêm vào .env
+envEXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyC...
+cài thêm 
+npx expo install react-native-webview
+ở nhánh feature/signin
