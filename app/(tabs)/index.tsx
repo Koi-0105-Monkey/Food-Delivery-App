@@ -11,9 +11,10 @@ import { images, offers } from '@/constants';
 import useAuthStore from '@/store/auth.store';
 import { useAddressStore } from '@/store/address.store';
 
+
 export default function Index() {
     const { user } = useAuthStore();
-    const { getDisplayAddress } = useAddressStore();
+    const { getDisplayAddress, fetchAddress } = useAddressStore();
     const params = useLocalSearchParams<{ showWelcome?: string }>();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showAddressModal, setShowAddressModal] = useState(false);
@@ -23,7 +24,7 @@ export default function Index() {
         // Hiện modal cho cả signin và signup
         if (params.showWelcome === 'signin' || params.showWelcome === 'signup') {
             setModalType(params.showWelcome);
-            
+
             // Delay để UI render
             setTimeout(() => {
                 setShowSuccessModal(true);
@@ -33,6 +34,12 @@ export default function Index() {
             router.setParams({ showWelcome: undefined });
         }
     }, [params.showWelcome]);
+
+    useEffect(() => {
+        if (user) {
+            fetchAddress();
+        }
+    }, [user]);
 
     return (
         <SafeAreaView className="flex-1 bg-white">
@@ -51,10 +58,10 @@ export default function Index() {
                                 {({ pressed }) => (
                                     <Fragment>
                                         <View className={'h-full w-1/2'}>
-                                            <Image 
-                                                source={item.image} 
-                                                className={'size-full'} 
-                                                resizeMode={'contain'} 
+                                            <Image
+                                                source={item.image}
+                                                className={'size-full'}
+                                                resizeMode={'contain'}
                                             />
                                         </View>
 
@@ -80,17 +87,17 @@ export default function Index() {
                     <View className="flex-between flex-row w-full my-5">
                         <View className="flex-start">
                             <Text className="small-bold text-primary">DELIVER TO</Text>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 className="flex-center flex-row gap-x-1 mt-0.5"
                                 onPress={() => setShowAddressModal(true)}
                             >
                                 <Text className="paragraph-bold text-dark-100">
                                     {getDisplayAddress()}
                                 </Text>
-                                <Image 
-                                    source={images.arrowDown} 
-                                    className="size-3" 
-                                    resizeMode="contain" 
+                                <Image
+                                    source={images.arrowDown}
+                                    className="size-3"
+                                    resizeMode="contain"
                                 />
                             </TouchableOpacity>
                         </View>
