@@ -153,6 +153,8 @@ detailed explanations, cool features, and exercises to boost your skills. Give i
 
 
 
+branch : feature/edit-profile
+ add in terminal : npx expo install expo-image-picker
 
  🔑 Cách lấy Google Maps API Key:
 Bước 1: Truy cập Google Cloud Console

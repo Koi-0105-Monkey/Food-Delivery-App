@@ -1,16 +1,17 @@
 import { Account, Avatars, Client, Databases, ID, Query, Storage } from 'react-native-appwrite';
-import { CreateUserParams, GetMenuParams, SignInParams } from '@/type';
+import { CreateUserParams, GetMenuParams, SignInParams, User } from '@/type';
+
 
 export const appwriteConfig = {
     endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!,
     projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!,
-    platform: 'com.AKEshop.FoodDelivery',
-    databaseId: '68629ae60038a7c61fe4',
-    bucketId: '692334a700377dae1061',
+    platform: 'com.AKEshop.myfoodapp',
+    databaseId: '6927c468001041ff0fc7',
+    bucketId: '6927c9b60006fc984a45',
     userCollectionId: 'users',
-    categoriesCollectionId: '692315a6001ae62780a0',
+    categoriesCollectionId: 'categories',
     menuCollectionId: 'menu',
-    customizationsCollectionId: 'customizations',
+    customizationsCollectionId: 'custamizations',
     menuCustomizationsCollectionId: 'menu_customizations',
     // NEW: Collections for address and cart
     userAddressesCollectionId: 'user_addresses',
@@ -384,5 +385,70 @@ export const clearCartFromServer = async (userId: string) => {
         console.log('✅ Cart cleared from server');
     } catch (error: any) {
         console.error('❌ Clear cart error:', error);
+    }
+};
+
+// 👇 HÀM NÀY ĐÃ ĐƯỢC SỬA: Loại bỏ listDocuments và sử dụng Document ID (userId) trực tiếp để update.
+export const updateUserProfile = async ({ 
+    userId, // Lúc này là Document ID
+    name, 
+    phone, 
+    avatarUri 
+}: {
+    userId: string;
+    name: string;
+    phone: string;
+    avatarUri: string;
+}): Promise<User> => {
+    try {
+        const userDocId = userId; // Sử dụng userId là Document ID để cập nhật
+
+        let finalAvatarUrl = avatarUri;
+
+        // Nếu avatar là local file (từ image picker), upload lên storage
+        if (avatarUri.startsWith('file://')) {
+            console.log('📤 Uploading new avatar...');
+            
+            const response = await fetch(avatarUri);
+            const blob = await response.blob();
+            
+            // Upload file
+            const file = await storage.createFile(
+                appwriteConfig.bucketId,
+                ID.unique(),
+                {
+                    name: `avatar-${userId}-${Date.now()}.jpg`,
+                    type: 'image/jpeg',
+                    size: blob.size,
+                    uri: avatarUri,
+                }
+            );
+
+            // Lấy URL để view
+            finalAvatarUrl = storage.getFileView(
+                appwriteConfig.bucketId, 
+                file.$id
+            ).toString();
+
+            console.log('✅ Avatar uploaded successfully');
+        }
+
+        // Update user document với tất cả thông tin bằng Document ID
+        const updatedDoc = await databases.updateDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.userCollectionId,
+            userDocId, // Sử dụng Document ID để update
+            {
+                name,
+                phone,
+                avatar: finalAvatarUrl,
+            }
+        );
+
+        console.log('✅ Profile updated successfully');
+        return updatedDoc as User;
+    } catch (error: any) {
+        console.error('❌ Update profile error:', error);
+        throw new Error(error.message || 'Failed to update profile');
     }
 };
