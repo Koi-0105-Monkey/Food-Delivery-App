@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { account } from '@/lib/appwrite';
 import { useState } from 'react';
 import AddressModal from '@/components/AddressModal';
+import EditProfileModal from '@/components/EditProfileModal';
 
 const ProfileField = ({ label, value, icon }: { label: string; value: string; icon: any }) => (
     <View className="profile-field">
@@ -25,6 +26,7 @@ const Profile = () => {
     const { address, getDisplayAddress } = useAddressStore();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [showAddressModal, setShowAddressModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
 
     const handleLogout = async () => {
         Alert.alert(
@@ -61,13 +63,9 @@ const Profile = () => {
             return Alert.alert('No Address', 'Please set your delivery address first.');
         }
 
-        // Encode địa chỉ để sử dụng trong URL
         const encodedAddress = encodeURIComponent(address.fullAddress);
-        
-        // URL cho Google Maps
         const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
 
-        // Mở Google Maps
         Linking.openURL(mapsUrl).catch(() => {
             Alert.alert('Error', 'Unable to open Google Maps');
         });
@@ -92,7 +90,10 @@ const Profile = () => {
                             className="size-full rounded-full"
                             resizeMode="cover"
                         />
-                        <TouchableOpacity className="profile-edit">
+                        <TouchableOpacity 
+                            className="profile-edit"
+                            onPress={() => setShowEditModal(true)}
+                        >
                             <Image
                                 source={images.pencil}
                                 className="size-3"
@@ -123,7 +124,7 @@ const Profile = () => {
 
                     <ProfileField
                         label="Phone Number"
-                        value="+1 234 567 8900"
+                        value={user?.phone || 'Not set'}
                         icon={images.phone}
                     />
 
@@ -136,6 +137,25 @@ const Profile = () => {
 
                 {/* Action Buttons */}
                 <View className="gap-4">
+                    {/* Edit Profile */}
+                    <TouchableOpacity
+                        className="bg-white border border-gray-200 rounded-2xl p-5 flex-row items-center justify-between"
+                        onPress={() => setShowEditModal(true)}
+                    >
+                        <View className="flex-row items-center gap-3">
+                            <View className="size-12 rounded-full bg-primary/10 flex-center">
+                                <Image
+                                    source={images.pencil}
+                                    className="size-6"
+                                    resizeMode="contain"
+                                    tintColor="#FE8C00"
+                                />
+                            </View>
+                            <Text className="paragraph-semibold text-dark-100">Edit Profile</Text>
+                        </View>
+                        <Image source={images.arrowRight} className="size-5" resizeMode="contain" />
+                    </TouchableOpacity>
+
                     {/* Update Address */}
                     <TouchableOpacity
                         className="bg-white border border-gray-200 rounded-2xl p-5 flex-row items-center justify-between"
@@ -199,25 +219,6 @@ const Profile = () => {
                         <Image source={images.arrowRight} className="size-5" resizeMode="contain" />
                     </TouchableOpacity>
 
-                    {/* Edit Profile */}
-                    <TouchableOpacity
-                        className="bg-white border border-gray-200 rounded-2xl p-5 flex-row items-center justify-between"
-                        onPress={() => Alert.alert('Coming Soon', 'Edit profile feature coming soon!')}
-                    >
-                        <View className="flex-row items-center gap-3">
-                            <View className="size-12 rounded-full bg-primary/10 flex-center">
-                                <Image
-                                    source={images.pencil}
-                                    className="size-6"
-                                    resizeMode="contain"
-                                    tintColor="#FE8C00"
-                                />
-                            </View>
-                            <Text className="paragraph-semibold text-dark-100">Edit Profile</Text>
-                        </View>
-                        <Image source={images.arrowRight} className="size-5" resizeMode="contain" />
-                    </TouchableOpacity>
-
                     {/* Logout */}
                     <TouchableOpacity
                         className="bg-error/10 border border-error rounded-2xl p-5 flex-row items-center justify-between"
@@ -252,6 +253,12 @@ const Profile = () => {
                     <Text className="small-bold text-gray-200 mt-1">Version 1.0.0</Text>
                 </View>
             </ScrollView>
+
+            {/* Edit Profile Modal */}
+            <EditProfileModal
+                visible={showEditModal}
+                onClose={() => setShowEditModal(false)}
+            />
 
             {/* Address Modal */}
             <AddressModal

@@ -7,12 +7,12 @@ const FormData = require('form-data');
 
 // ========== CẤU HÌNH APPWRITE ==========
 // Hardcode API Key trực tiếp
-const API_KEY = 'standard_13b9401fd29684bb5adb80d060c6ef703af46eeca76b456181289fdd9ece957a20503d8ef46bfa42bd82aa48433f58181fe12aa42cb8b41066441ea00478cc811cdd4864ceb7c8d7003bdf39a017f5f1842f5963637733fb93b8be984fb4da391f118291ffba6599291c25215468597da58b678716fd41b35e6a240095c95dd1';
+const API_KEY = 'standard_c9f94d4e2c13a8df7325ae8914bdb6c4f17d92af7461d2bae9e4cc0bdac9395bbabfd5b87f9ab9eb596c1ea9cac286442d954c5fec5eb795f47879bce69539ed12224544b1d5f50d597536a8a06c50df0bddbd91f6c8b0aca3739eb2b2131fd89bf1b7bc86585cdd52c161e22cb602278e5d45d7b87ebbdfdee3be3b8d1df7a1';
 
 // ⚠️ THAY ĐỔI endpoint theo region của bạn
 // Kiểm tra trong Appwrite Console > Settings > Endpoint
-const ENDPOINT = 'https://nyc.cloud.appwrite.io/v1'; // hoặc region khác của bạn
-const PROJECT_ID = '69230ad2001fb8f2aee4';
+const ENDPOINT = 'https://sgp.cloud.appwrite.io/v1'; // hoặc region khác của bạn
+const PROJECT_ID = '6927c3e3000eb4b8dcce';
 
 const client = new sdk.Client()
     .setEndpoint(ENDPOINT)
@@ -23,12 +23,12 @@ const databases = new sdk.Databases(client);
 const storage = new sdk.Storage(client);
 
 // Sử dụng đúng config từ appwrite.ts
-const DATABASE_ID = '68629ae60038a7c61fe4';
-const CATEGORIES_COLLECTION_ID = '692315a6001ae62780a0';
-const CUSTOMIZATIONS_COLLECTION_ID = 'customizations';
+const DATABASE_ID = '6927c468001041ff0fc7';
+const CATEGORIES_COLLECTION_ID = 'categories';
+const CUSTOMIZATIONS_COLLECTION_ID = 'custamizations';
 const MENU_COLLECTION_ID = 'menu';
 const MENU_CUSTOMIZATIONS_COLLECTION_ID = 'menu_customizations';
-const BUCKET_ID = '692334a700377dae1061';
+const BUCKET_ID = '6927c9b60006fc984a45';
 
 // ========== DỮ LIỆU ==========
 const dummyData = {
