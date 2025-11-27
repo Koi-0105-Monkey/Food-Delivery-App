@@ -4,13 +4,11 @@ import CustomInput from '@/components/CustomInput';
 import CustomButton from '@/components/CustomButton';
 import { useState } from 'react';
 import { createUser } from '@/lib/appwrite';
-import SuccessModal from '@/components/SuccessModal';
 import useAuthStore from '@/store/auth.store';
 import * as Sentry from '@sentry/react-native';
 
 const SignUp = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [form, setForm] = useState({ name: '', email: '', password: '' });
     const { fetchAuthenticatedUser } = useAuthStore();
 
@@ -47,6 +45,11 @@ const SignUp = () => {
             // Fetch user data and update auth state
             await fetchAuthenticatedUser();
 
+            console.log('✅ User fetched, redirecting to home...');
+
+            // Redirect to home với param để trigger modal
+            router.replace('/?showWelcome=signup');
+
         } catch (error: any) {
             console.error('❌ Sign up error:', error);
             
@@ -69,45 +72,43 @@ const SignUp = () => {
     };
 
     return (
-        <>
-            <View className="gap-10 bg-white rounded-lg p-5 mt-5">
-                <CustomInput
-                    placeholder="Enter your full name"
-                    value={form.name}
-                    onChangeText={(text) => setForm((prev) => ({ ...prev, name: text }))}
-                    label="Full name"
-                />
-                <CustomInput
-                    placeholder="Enter your email"
-                    value={form.email}
-                    onChangeText={(text) => setForm((prev) => ({ ...prev, email: text }))}
-                    label="Email"
-                    keyboardType="email-address"
-                />
-                <CustomInput
-                    placeholder="Enter your password (min 8 characters)"
-                    value={form.password}
-                    onChangeText={(text) => setForm((prev) => ({ ...prev, password: text }))}
-                    label="Password"
-                    secureTextEntry={true}
-                />
+        <View className="gap-10 bg-white rounded-lg p-5 mt-5">
+            <CustomInput
+                placeholder="Enter your full name"
+                value={form.name}
+                onChangeText={(text) => setForm((prev) => ({ ...prev, name: text }))}
+                label="Full name"
+            />
+            <CustomInput
+                placeholder="Enter your email"
+                value={form.email}
+                onChangeText={(text) => setForm((prev) => ({ ...prev, email: text }))}
+                label="Email"
+                keyboardType="email-address"
+            />
+            <CustomInput
+                placeholder="Enter your password (min 8 characters)"
+                value={form.password}
+                onChangeText={(text) => setForm((prev) => ({ ...prev, password: text }))}
+                label="Password"
+                secureTextEntry={true}
+            />
 
-                <CustomButton
-                    title="Sign Up"
-                    isLoading={isSubmitting}
-                    onPress={submit}
-                />
+            <CustomButton
+                title="Sign Up"
+                isLoading={isSubmitting}
+                onPress={submit}
+            />
 
-                <View className="flex justify-center mt-5 flex-row gap-2">
-                    <Text className="base-regular text-gray-100">
-                        Already have an account?
-                    </Text>
-                    <Link href="/sign-in" className="base-bold text-primary">
-                        Sign In
-                    </Link>
-                </View>
+            <View className="flex justify-center mt-5 flex-row gap-2">
+                <Text className="base-regular text-gray-100">
+                    Already have an account?
+                </Text>
+                <Link href="/sign-in" className="base-bold text-primary">
+                    Sign In
+                </Link>
             </View>
-        </>
+        </View>
     );
 };
 
