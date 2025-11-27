@@ -17,16 +17,22 @@ export default function Index() {
     const params = useLocalSearchParams<{ showWelcome?: string }>();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showAddressModal, setShowAddressModal] = useState(false);
+    const [modalType, setModalType] = useState<'signup' | 'signin'>('signin');
 
     useEffect(() => {
-    if (params.showWelcome === 'signin') {
-        setTimeout(() => setShowSuccessModal(true), 300);
-        router.setParams({ showWelcome: undefined });
-    } else if (params.showWelcome === 'signup') {
-        setTimeout(() => setShowSuccessModal(true), 300);
-        router.setParams({ showWelcome: undefined });
-    }
-}, [params.showWelcome]);
+        // Hiện modal cho cả signin và signup
+        if (params.showWelcome === 'signin' || params.showWelcome === 'signup') {
+            setModalType(params.showWelcome);
+            
+            // Delay để UI render
+            setTimeout(() => {
+                setShowSuccessModal(true);
+            }, 300);
+
+            // Clear param
+            router.setParams({ showWelcome: undefined });
+        }
+    }, [params.showWelcome]);
 
     return (
         <SafeAreaView className="flex-1 bg-white">
@@ -94,21 +100,17 @@ export default function Index() {
                 )}
             />
 
-            {/* Success Modal - Chỉ cho Sign In */}
+            {/* Success Modal - Cho cả Sign In và Sign Up */}
             <SuccessModal
                 visible={showSuccessModal}
                 onClose={() => setShowSuccessModal(false)}
-                title="Welcome Back! 🍕"
-                message="You're now signed in. Let's order some delicious food!"
-                type="signin"
-            />
-
-            <SuccessModal
-                visible={showSuccessModal}
-                onClose={() => setShowSuccessModal(false)}
-                title="Welcome Aboard! 🎉"
-                message="Your account has been created successfully. Get ready to explore delicious food options!"
-                type="signup"
+                title={modalType === 'signup' ? 'Welcome Aboard! 🎉' : 'Welcome Back! 🍕'}
+                message={
+                    modalType === 'signup'
+                        ? 'Your account has been created successfully. Get ready to explore delicious food options!'
+                        : "You're now signed in. Let's order some delicious food!"
+                }
+                type={modalType}
             />
 
             {/* Address Modal */}
