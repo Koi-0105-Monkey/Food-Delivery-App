@@ -1,23 +1,52 @@
 import { Account, Avatars, Client, Databases, ID, Query, Storage } from 'react-native-appwrite';
 import { CreateUserParams, GetMenuParams, SignInParams, User } from '@/type';
 
-
+// ========== APPWRITE CONFIGURATION FROM ENV ==========
 export const appwriteConfig = {
+    // Project Settings
     endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!,
     projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!,
-    platform: 'com.AKEshop.myfoodapp',
-    databaseId: '6927c468001041ff0fc7',
-    bucketId: '6927c9b60006fc984a45',
-    userCollectionId: 'users',
-    categoriesCollectionId: 'categories',
-    menuCollectionId: 'menu',
-    customizationsCollectionId: 'custamizations',
-    menuCustomizationsCollectionId: 'menu_customizations',
-    // NEW: Collections for address and cart
-    userAddressesCollectionId: 'user_addresses',
-    cartItemsCollectionId: 'cart_items',
+    platform: process.env.EXPO_PUBLIC_APPWRITE_PLATFORM!,
+    
+    // Database & Storage
+    databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
+    bucketId: process.env.EXPO_PUBLIC_APPWRITE_BUCKET_ID!,
+    
+    // Collection IDs
+    userCollectionId: process.env.EXPO_PUBLIC_APPWRITE_USERS_COLLECTION_ID!,
+    categoriesCollectionId: process.env.EXPO_PUBLIC_APPWRITE_CATEGORIES_COLLECTION_ID!,
+    menuCollectionId: process.env.EXPO_PUBLIC_APPWRITE_MENU_COLLECTION_ID!,
+    customizationsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_CUSTOMIZATIONS_COLLECTION_ID!,
+    menuCustomizationsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_MENU_CUSTOMIZATIONS_COLLECTION_ID!,
+    userAddressesCollectionId: process.env.EXPO_PUBLIC_APPWRITE_USER_ADDRESSES_COLLECTION_ID!,
+    cartItemsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_CART_ITEMS_COLLECTION_ID!,
 };
 
+// Validate required environment variables
+const requiredEnvVars = [
+    'EXPO_PUBLIC_APPWRITE_ENDPOINT',
+    'EXPO_PUBLIC_APPWRITE_PROJECT_ID',
+    'EXPO_PUBLIC_APPWRITE_PLATFORM',
+    'EXPO_PUBLIC_APPWRITE_DATABASE_ID',
+    'EXPO_PUBLIC_APPWRITE_BUCKET_ID',
+];
+
+for (const envVar of requiredEnvVars) {
+    if (!process.env[envVar]) {
+        throw new Error(`❌ Missing required environment variable: ${envVar}`);
+    }
+}
+
+// Log configuration in debug mode
+if (process.env.DEBUG_MODE === 'true') {
+    console.log('📋 Appwrite Config:', {
+        endpoint: appwriteConfig.endpoint,
+        projectId: appwriteConfig.projectId,
+        databaseId: appwriteConfig.databaseId,
+    });
+}
+
+// ========== CLIENT INITIALIZATION ==========
 export const client = new Client();
 
 client
@@ -34,6 +63,7 @@ const avatars = new Avatars(client);
 const waitForSession = (ms: number = 500) => 
     new Promise(resolve => setTimeout(resolve, ms));
 
+// ========== AUTH FUNCTIONS ==========
 export const createUser = async ({ email, password, name }: CreateUserParams) => {
     try {
         // Check if session exists and delete it
@@ -193,6 +223,7 @@ export const getCurrentUser = async () => {
     }
 };
 
+// ========== MENU FUNCTIONS ==========
 export const getMenu = async ({ category, query }: GetMenuParams) => {
     try {
         const queries: string[] = [];
@@ -228,7 +259,6 @@ export const getCategories = async () => {
 };
 
 // ========== ADDRESS FUNCTIONS ==========
-
 export const saveUserAddress = async (userId: string, address: {
     street: string;
     city: string;
@@ -241,7 +271,7 @@ export const saveUserAddress = async (userId: string, address: {
         const existing = await databases.listDocuments(
             appwriteConfig.databaseId,
             appwriteConfig.userAddressesCollectionId,
-            [Query.equal('user_id', userId)] // snake_case
+            [Query.equal('user_id', userId)]
         );
 
         // If exists, update. If not, create.
@@ -254,8 +284,8 @@ export const saveUserAddress = async (userId: string, address: {
                     street: address.street,
                     city: address.city,
                     country: address.country,
-                    full_address: address.fullAddress, // snake_case
-                    is_default: address.isDefault ?? true, // snake_case
+                    full_address: address.fullAddress,
+                    is_default: address.isDefault ?? true,
                 }
             );
             return doc;
@@ -265,12 +295,12 @@ export const saveUserAddress = async (userId: string, address: {
                 appwriteConfig.userAddressesCollectionId,
                 ID.unique(),
                 {
-                    user_id: userId, // snake_case
+                    user_id: userId,
                     street: address.street,
                     city: address.city,
                     country: address.country,
-                    full_address: address.fullAddress, // snake_case
-                    is_default: address.isDefault ?? true, // snake_case
+                    full_address: address.fullAddress,
+                    is_default: address.isDefault ?? true,
                 }
             );
             return doc;
@@ -286,7 +316,7 @@ export const getUserAddress = async (userId: string) => {
         const addresses = await databases.listDocuments(
             appwriteConfig.databaseId,
             appwriteConfig.userAddressesCollectionId,
-            [Query.equal('user_id', userId)] // snake_case
+            [Query.equal('user_id', userId)]
         );
 
         if (addresses.documents.length === 0) return null;
@@ -299,14 +329,13 @@ export const getUserAddress = async (userId: string) => {
 };
 
 // ========== CART FUNCTIONS ==========
-
 export const syncCartToServer = async (userId: string, cartItems: any[]) => {
     try {
         // Delete all existing cart items for this user
         const existing = await databases.listDocuments(
             appwriteConfig.databaseId,
             appwriteConfig.cartItemsCollectionId,
-            [Query.equal('user_id', userId)] // snake_case
+            [Query.equal('user_id', userId)]
         );
 
         for (const item of existing.documents) {
@@ -324,11 +353,11 @@ export const syncCartToServer = async (userId: string, cartItems: any[]) => {
                 appwriteConfig.cartItemsCollectionId,
                 ID.unique(),
                 {
-                    user_id: userId, // snake_case
-                    menu_id: item.id, // snake_case
+                    user_id: userId,
+                    menu_id: item.id,
                     name: item.name,
                     price: item.price,
-                    image_url: item.image_url, // snake_case
+                    image_url: item.image_url,
                     quantity: item.quantity,
                     customizations: JSON.stringify(item.customizations || []),
                 }
@@ -348,15 +377,15 @@ export const getCartFromServer = async (userId: string) => {
         const cartItems = await databases.listDocuments(
             appwriteConfig.databaseId,
             appwriteConfig.cartItemsCollectionId,
-            [Query.equal('user_id', userId)] // snake_case
+            [Query.equal('user_id', userId)]
         );
 
         // Convert to cart format
         return cartItems.documents.map((doc: any) => ({
-            id: doc.menu_id, // snake_case
+            id: doc.menu_id,
             name: doc.name,
             price: doc.price,
-            image_url: doc.image_url, // snake_case
+            image_url: doc.image_url,
             quantity: doc.quantity,
             customizations: JSON.parse(doc.customizations || '[]'),
         }));
@@ -371,7 +400,7 @@ export const clearCartFromServer = async (userId: string) => {
         const existing = await databases.listDocuments(
             appwriteConfig.databaseId,
             appwriteConfig.cartItemsCollectionId,
-            [Query.equal('user_id', userId)] // snake_case
+            [Query.equal('user_id', userId)]
         );
 
         for (const item of existing.documents) {
@@ -388,9 +417,9 @@ export const clearCartFromServer = async (userId: string) => {
     }
 };
 
-// 👇 HÀM NÀY ĐÃ ĐƯỢC SỬA: Loại bỏ listDocuments và sử dụng Document ID (userId) trực tiếp để update.
+// ========== USER PROFILE FUNCTIONS ==========
 export const updateUserProfile = async ({ 
-    userId, // Lúc này là Document ID
+    userId,
     name, 
     phone, 
     avatarUri 
@@ -401,11 +430,11 @@ export const updateUserProfile = async ({
     avatarUri: string;
 }): Promise<User> => {
     try {
-        const userDocId = userId; // Sử dụng userId là Document ID để cập nhật
+        const userDocId = userId;
 
         let finalAvatarUrl = avatarUri;
 
-        // Nếu avatar là local file (từ image picker), upload lên storage
+        // If avatar is local file (from image picker), upload to storage
         if (avatarUri.startsWith('file://')) {
             console.log('📤 Uploading new avatar...');
             
@@ -424,7 +453,7 @@ export const updateUserProfile = async ({
                 }
             );
 
-            // Lấy URL để view
+            // Get view URL
             finalAvatarUrl = storage.getFileView(
                 appwriteConfig.bucketId, 
                 file.$id
@@ -433,11 +462,11 @@ export const updateUserProfile = async ({
             console.log('✅ Avatar uploaded successfully');
         }
 
-        // Update user document với tất cả thông tin bằng Document ID
+        // Update user document
         const updatedDoc = await databases.updateDocument(
             appwriteConfig.databaseId,
             appwriteConfig.userCollectionId,
-            userDocId, // Sử dụng Document ID để update
+            userDocId,
             {
                 name,
                 phone,
