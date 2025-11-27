@@ -3,16 +3,11 @@ import { CreateUserParams, GetMenuParams, SignInParams, User } from '@/type';
 
 // ========== APPWRITE CONFIGURATION FROM ENV ==========
 export const appwriteConfig = {
-    // Project Settings
     endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!,
     projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!,
     platform: process.env.EXPO_PUBLIC_APPWRITE_PLATFORM!,
-    
-    // Database & Storage
     databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
     bucketId: process.env.EXPO_PUBLIC_APPWRITE_BUCKET_ID!,
-    
-    // Collection IDs
     userCollectionId: process.env.EXPO_PUBLIC_APPWRITE_USERS_COLLECTION_ID!,
     categoriesCollectionId: process.env.EXPO_PUBLIC_APPWRITE_CATEGORIES_COLLECTION_ID!,
     menuCollectionId: process.env.EXPO_PUBLIC_APPWRITE_MENU_COLLECTION_ID!,
@@ -35,15 +30,6 @@ for (const envVar of requiredEnvVars) {
     if (!process.env[envVar]) {
         throw new Error(`❌ Missing required environment variable: ${envVar}`);
     }
-}
-
-// Log configuration in debug mode
-if (process.env.DEBUG_MODE === 'true') {
-    console.log('📋 Appwrite Config:', {
-        endpoint: appwriteConfig.endpoint,
-        projectId: appwriteConfig.projectId,
-        databaseId: appwriteConfig.databaseId,
-    });
 }
 
 // ========== CLIENT INITIALIZATION ==========
@@ -123,7 +109,6 @@ export const createUser = async ({ email, password, name }: CreateUserParams) =>
     } catch (error: any) {
         console.error('❌ Create user error:', error);
 
-        // Handle specific errors
         if (error.code === 409) {
             throw new Error('user_already_exists');
         }
@@ -170,7 +155,6 @@ export const signIn = async ({ email, password }: SignInParams) => {
     } catch (error: any) {
         console.error('❌ Sign in error:', error);
 
-        // Handle specific errors
         if (error.code === 401) {
             throw new Error('Invalid credentials');
         }
@@ -431,20 +415,22 @@ export const updateUserProfile = async ({
 }): Promise<User> => {
     try {
         const userDocId = userId;
-
         let finalAvatarUrl = avatarUri;
 
-        // If avatar is local file (from image picker), upload to storage
+        // 🔥 FIX: If avatar is local file (from image picker), upload to storage
         if (avatarUri.startsWith('file://')) {
             console.log('📤 Uploading new avatar...');
             
             const response = await fetch(avatarUri);
             const blob = await response.blob();
             
-            // Upload file
+            // Create unique file ID
+            const fileId = ID.unique();
+            
+            // Upload file using InputFile
             const file = await storage.createFile(
                 appwriteConfig.bucketId,
-                ID.unique(),
+                fileId,
                 {
                     name: `avatar-${userId}-${Date.now()}.jpg`,
                     type: 'image/jpeg',
@@ -453,13 +439,10 @@ export const updateUserProfile = async ({
                 }
             );
 
-            // Get view URL
-            finalAvatarUrl = storage.getFileView(
-                appwriteConfig.bucketId, 
-                file.$id
-            ).toString();
+            // 🔥 FIX: Get proper view URL with project parameter
+            finalAvatarUrl = `${appwriteConfig.endpoint}/storage/buckets/${appwriteConfig.bucketId}/files/${file.$id}/view?project=${appwriteConfig.projectId}`;
 
-            console.log('✅ Avatar uploaded successfully');
+            console.log('✅ Avatar uploaded successfully:', finalAvatarUrl);
         }
 
         // Update user document
