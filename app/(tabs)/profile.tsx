@@ -1,11 +1,11 @@
 import { View, Text, Image, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEffect, useState } from 'react';
 import useAuthStore from '@/store/auth.store';
 import { useAddressStore } from '@/store/address.store';
 import { images } from '@/constants';
 import { router } from 'expo-router';
 import { account } from '@/lib/appwrite';
-import { useState } from 'react';
 import AddressModal from '@/components/AddressModal';
 
 const ProfileField = ({ label, value, icon }: { label: string; value: string; icon: any }) => (
@@ -22,9 +22,16 @@ const ProfileField = ({ label, value, icon }: { label: string; value: string; ic
 
 const Profile = () => {
     const { user, setIsAuthenticated, setUser } = useAuthStore();
-    const { address, getDisplayAddress } = useAddressStore();
+    const { address, getDisplayAddress, fetchAddress } = useAddressStore();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [showAddressModal, setShowAddressModal] = useState(false);
+
+    // Load địa chỉ khi vào profile
+    useEffect(() => {
+        if (user) {
+            fetchAddress();
+        }
+    }, [user]);
 
     const handleLogout = async () => {
         Alert.alert(
@@ -256,7 +263,11 @@ const Profile = () => {
             {/* Address Modal */}
             <AddressModal
                 visible={showAddressModal}
-                onClose={() => setShowAddressModal(false)}
+                onClose={() => {
+                    setShowAddressModal(false);
+                    // Refresh address sau khi đóng modal
+                    fetchAddress();
+                }}
             />
         </SafeAreaView>
     );

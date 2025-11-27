@@ -1,5 +1,9 @@
 import { create } from 'zustand';
-import { saveUserAddress, getUserAddress, getCurrentUser } from '@/lib/appwrite';
+import { 
+    saveUserAddress, 
+    getUserAddress,
+    getCurrentUser 
+} from '@/lib/appwrite';
 
 export interface Address {
     street: string;
@@ -59,7 +63,12 @@ export const useAddressStore = create<AddressState>((set, get) => ({
 
             // Lấy userId từ Appwrite
             const user = await getCurrentUser();
-            if (!user) throw new Error('No user logged in');
+            if (!user) {
+                console.log('⚠️ No user logged in, skipping address fetch');
+                set({ address: null, isLoading: false });
+                return;
+            }
+
             const userId = user.$id;
 
             const addressDoc = await getUserAddress(userId);
@@ -72,13 +81,14 @@ export const useAddressStore = create<AddressState>((set, get) => ({
                     fullAddress: addressDoc.full_address, // snake_case from server
                 };
                 set({ address, isLoading: false });
-                console.log('✅ Address loaded from server');
+                console.log('✅ Address loaded from server:', address.fullAddress);
             } else {
                 set({ address: null, isLoading: false });
+                console.log('⚠️ No address found for user');
             }
         } catch (error) {
             console.error('❌ Failed to fetch address:', error);
-            set({ isLoading: false });
+            set({ address: null, isLoading: false });
         }
     },
 
@@ -86,12 +96,12 @@ export const useAddressStore = create<AddressState>((set, get) => ({
 
     getDisplayAddress: () => {
         const { address } = get();
-        if (!address) return 'Croatia'; // Default
+        if (!address) return 'Set delivery address';
         
         if (address.city && address.country) {
             return `${address.city}, ${address.country}`;
         }
         
-        return address.country || 'Croatia';
+        return address.country || 'Set delivery address';
     },
 }));
