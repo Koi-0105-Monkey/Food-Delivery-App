@@ -11,6 +11,8 @@ import {
     Alert,
     ScrollView,
     ActivityIndicator,
+    ActionSheetIOS,
+    Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { images } from '@/constants';
@@ -81,17 +83,81 @@ const EditProfileModal = ({ visible, onClose }: EditProfileModalProps) => {
         });
     };
 
-    const pickImage = async () => {
+    // 🔥 FIXED: Action Sheet để chọn Camera/Gallery
+    const showImagePickerOptions = () => {
+        if (Platform.OS === 'ios') {
+            ActionSheetIOS.showActionSheetWithOptions(
+                {
+                    options: ['Cancel', 'Take Photo', 'Choose from Library'],
+                    cancelButtonIndex: 0,
+                },
+                async (buttonIndex) => {
+                    if (buttonIndex === 1) {
+                        await pickImageFromCamera();
+                    } else if (buttonIndex === 2) {
+                        await pickImageFromGallery();
+                    }
+                }
+            );
+        } else {
+            // Android: Show custom alert
+            Alert.alert(
+                'Change Profile Photo',
+                'Choose an option',
+                [
+                    {
+                        text: 'Cancel',
+                        style: 'cancel',
+                    },
+                    {
+                        text: 'Take Photo',
+                        onPress: pickImageFromCamera,
+                    },
+                    {
+                        text: 'Choose from Library',
+                        onPress: pickImageFromGallery,
+                    },
+                ],
+                { cancelable: true }
+            );
+        }
+    };
+
+    // 🔥 FIXED: Chụp ảnh từ Camera
+    const pickImageFromCamera = async () => {
         try {
-            // Request permission
-            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
             
             if (status !== 'granted') {
-                Alert.alert('Permission Denied', 'We need camera roll permissions to change your avatar.');
+                Alert.alert('Permission Denied', 'We need camera permissions to take a photo.');
                 return;
             }
 
-            // Launch image picker
+            const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                setForm(prev => ({ ...prev, avatarUri: result.assets[0].uri }));
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to take photo');
+        }
+    };
+
+    // 🔥 FIXED: Chọn ảnh từ Gallery
+    const pickImageFromGallery = async () => {
+        try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            
+            if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'We need photo library permissions to choose a photo.');
+                return;
+            }
+
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 allowsEditing: true,
@@ -122,7 +188,6 @@ const EditProfileModal = ({ visible, onClose }: EditProfileModalProps) => {
         try {
             if (!user) throw new Error('No user found');
 
-            // 👇 Đã sửa: Truyền user.$id (là Document ID) vào hàm cập nhật
             const updatedDoc = await updateUserProfile({
                 userId: user.$id, 
                 name: form.name.trim(),
@@ -130,7 +195,6 @@ const EditProfileModal = ({ visible, onClose }: EditProfileModalProps) => {
                 avatarUri: form.avatarUri,
             });
 
-            // Update local state với type assertion
             setUser(updatedDoc as User);
 
             Alert.alert('Success', 'Profile updated successfully!');
@@ -222,8 +286,9 @@ const EditProfileModal = ({ visible, onClose }: EditProfileModalProps) => {
                                 resizeMode="cover"
                             />
                         </View>
+                        {/* 🔥 FIXED: Click để chọn Camera/Gallery */}
                         <TouchableOpacity
-                            onPress={pickImage}
+                            onPress={showImagePickerOptions}
                             style={{
                                 marginTop: 12,
                                 backgroundColor: '#FFF5E6',
