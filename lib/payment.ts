@@ -16,7 +16,7 @@ function generateOrderNumber(): string {
 }
 
 /**
- * Generate QR Code cho thanh toán Momo
+ * Generate QR Code cho thanh toán Momo với STK của bạn
  */
 export function generatePaymentQR(params: {
     amount: number;
@@ -24,15 +24,16 @@ export function generatePaymentQR(params: {
 }): QRCodeData {
     const { amount, orderNumber } = params;
     
-    // Config Momo
+    // ✅ Thông tin Momo của bạn
     const momoConfig = {
-        accountNumber: '0123456789', // Thay bằng số Momo của bạn
-        accountName: 'NGUYEN VAN A',
+        accountNumber: '0896494752', // ✅ STK Momo của bạn
+        accountName: 'HUYNH DUC KHOI', // ✅ Tên của bạn (viết hoa không dấu)
     };
     
     const description = `Payment ${orderNumber}`;
     
-    // Generate QR URL sử dụng VietQR API (miễn phí)
+    // ✅ Generate QR URL với STK của bạn
+    // VietQR hỗ trợ tạo dynamic QR với số tiền
     const qrUrl = `https://img.vietqr.io/image/MOMO-${momoConfig.accountNumber}-compact.jpg?amount=${amount}&addInfo=${encodeURIComponent(description)}`;
     
     return {
