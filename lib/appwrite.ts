@@ -243,57 +243,6 @@ export const getCategories = async () => {
 };
 
 // ========== ADDRESS FUNCTIONS ==========
-export const saveUserAddress = async (userId: string, address: {
-    street: string;
-    city: string;
-    country: string;
-    fullAddress: string;
-    isDefault?: boolean;
-}) => {
-    try {
-        // Check if user already has an address
-        const existing = await databases.listDocuments(
-            appwriteConfig.databaseId,
-            appwriteConfig.userAddressesCollectionId,
-            [Query.equal('user_id', userId)]
-        );
-
-        // If exists, update. If not, create.
-        if (existing.documents.length > 0) {
-            const doc = await databases.updateDocument(
-                appwriteConfig.databaseId,
-                appwriteConfig.userAddressesCollectionId,
-                existing.documents[0].$id,
-                {
-                    street: address.street,
-                    city: address.city,
-                    country: address.country,
-                    full_address: address.fullAddress,
-                    is_default: address.isDefault ?? true,
-                }
-            );
-            return doc;
-        } else {
-            const doc = await databases.createDocument(
-                appwriteConfig.databaseId,
-                appwriteConfig.userAddressesCollectionId,
-                ID.unique(),
-                {
-                    user_id: userId,
-                    street: address.street,
-                    city: address.city,
-                    country: address.country,
-                    full_address: address.fullAddress,
-                    is_default: address.isDefault ?? true,
-                }
-            );
-            return doc;
-        }
-    } catch (error: any) {
-        console.error('❌ Save address error:', error);
-        throw new Error(error.message || 'Failed to save address');
-    }
-};
 
 export const getUserAddress = async (userId: string) => {
     try {
@@ -313,7 +262,7 @@ export const getUserAddress = async (userId: string) => {
 };
 
 // ========== CART FUNCTIONS ==========
-export const syncCartToServer = async (userId: string, cartItems: any[]) => {
+export const syncCartToServerLegacy = async (userId: string, cartItems: any[]) => {
     try {
         // Delete all existing cart items for this user
         const existing = await databases.listDocuments(
@@ -356,7 +305,7 @@ export const syncCartToServer = async (userId: string, cartItems: any[]) => {
     }
 };
 
-export const getCartFromServer = async (userId: string) => {
+export const getCartFromServerLegacy = async (userId: string) => {
     try {
         const cartItems = await databases.listDocuments(
             appwriteConfig.databaseId,
@@ -379,7 +328,7 @@ export const getCartFromServer = async (userId: string) => {
     }
 };
 
-export const clearCartFromServer = async (userId: string) => {
+export const clearCartFromServerLegacy = async (userId: string) => {
     try {
         const existing = await databases.listDocuments(
             appwriteConfig.databaseId,
@@ -462,5 +411,303 @@ export const updateUserProfile = async ({
     } catch (error: any) {
         console.error('❌ Update profile error:', error);
         throw new Error(error.message || 'Failed to update profile');
+    }
+};
+
+// ========== ADDRESS FUNCTIONS - MULTI ADDRESS SUPPORT ==========
+
+/**
+ * Lấy tất cả địa chỉ của user
+ */
+export const getUserAddresses = async (userId: string) => {
+    try {
+        const addresses = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.userAddressesCollectionId,
+            [Query.equal('user_id', userId)]
+        );
+
+        return addresses.documents;
+    } catch (error: any) {
+        console.error('❌ Get addresses error:', error);
+        return [];
+    }
+};
+
+/**
+ * Tạo unique key cho cart item (menu_id + customizations)
+ */
+function getCartItemKey(menuId: string, customizations: any[] = []) {
+    const customIds = customizations
+        .map(c => c.id)
+        .sort()
+        .join(',');
+    return `${menuId}|${customIds}`;
+}
+
+/**
+ * Sync giỏ hàng lên server (SMART SYNC - chỉ update thay đổi)
+ */
+export const syncCartToServer = async (userId: string, cartItems: any[]) => {
+    try {
+        // Get existing cart from server
+        const existing = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.cartItemsCollectionId,
+            [Query.equal('user_id', userId)]
+        );
+
+        // Create map of existing items
+        const existingMap = new Map();
+        for (const doc of existing.documents) {
+            const key = getCartItemKey(doc.menu_id, JSON.parse(doc.customizations || '[]'));
+            existingMap.set(key, doc);
+        }
+
+        // Create map of new items
+        const newMap = new Map();
+        for (const item of cartItems) {
+            const key = getCartItemKey(item.id, item.customizations);
+            newMap.set(key, item);
+        }
+
+        // DELETE items not in cart anymore
+        for (const [key, doc] of existingMap) {
+            if (!newMap.has(key)) {
+                await databases.deleteDocument(
+                    appwriteConfig.databaseId,
+                    appwriteConfig.cartItemsCollectionId,
+                    doc.$id
+                );
+                console.log(`🗑️  Deleted cart item: ${doc.name}`);
+            }
+        }
+
+        // UPDATE or CREATE items
+        for (const [key, item] of newMap) {
+            const existingDoc = existingMap.get(key);
+
+            if (existingDoc) {
+                // UPDATE quantity if changed
+                if (existingDoc.quantity !== item.quantity) {
+                    await databases.updateDocument(
+                        appwriteConfig.databaseId,
+                        appwriteConfig.cartItemsCollectionId,
+                        existingDoc.$id,
+                        {
+                            quantity: item.quantity,
+                            price: item.price,
+                        }
+                    );
+                    console.log(`🔄 Updated ${item.name}: qty ${existingDoc.quantity} → ${item.quantity}`);
+                }
+            } else {
+                // CREATE new item
+                await databases.createDocument(
+                    appwriteConfig.databaseId,
+                    appwriteConfig.cartItemsCollectionId,
+                    ID.unique(),
+                    {
+                        user_id: userId,
+                        menu_id: item.id,
+                        name: item.name,
+                        price: item.price,
+                        image_url: item.image_url,
+                        quantity: item.quantity,
+                        customizations: JSON.stringify(item.customizations || []),
+                    }
+                );
+                console.log(`➕ Added ${item.name} (qty: ${item.quantity})`);
+            }
+        }
+
+        console.log('✅ Cart synced to server');
+    } catch (error: any) {
+        console.error('❌ Sync cart error:', error);
+        throw new Error(error.message || 'Failed to sync cart');
+    }
+};
+
+/**
+ * Lấy giỏ hàng từ server
+ */
+export const getCartFromServer = async (userId: string) => {
+    try {
+        const cartItems = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.cartItemsCollectionId,
+            [Query.equal('user_id', userId)]
+        );
+
+        // Convert to cart format
+        return cartItems.documents.map((doc: any) => ({
+            id: doc.menu_id,
+            name: doc.name,
+            price: doc.price,
+            image_url: doc.image_url,
+            quantity: doc.quantity,
+            customizations: JSON.parse(doc.customizations || '[]'),
+        }));
+    } catch (error: any) {
+        console.error('❌ Get cart error:', error);
+        return [];
+    }
+};
+
+/**
+ * Xóa toàn bộ giỏ hàng trên server
+ */
+export const clearCartFromServer = async (userId: string) => {
+    try {
+        const existing = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.cartItemsCollectionId,
+            [Query.equal('user_id', userId)]
+        );
+
+        for (const item of existing.documents) {
+            await databases.deleteDocument(
+                appwriteConfig.databaseId,
+                appwriteConfig.cartItemsCollectionId,
+                item.$id
+            );
+        }
+
+        console.log('✅ Cart cleared from server');
+    } catch (error: any) {
+        console.error('❌ Clear cart error:', error);
+    }
+};
+
+/**
+ * Tạo địa chỉ mới
+ */
+export const saveUserAddress = async (userId: string, address: {
+    street: string;
+    city: string;
+    country: string;
+    fullAddress: string;
+    isDefault?: boolean;
+}) => {
+    try {
+        // Nếu là địa chỉ đầu tiên hoặc set là default, unset các địa chỉ default khác
+        if (address.isDefault) {
+            const existingAddresses = await getUserAddresses(userId);
+            
+            // Unset all existing defaults
+            for (const addr of existingAddresses) {
+                if (addr.is_default) {
+                    await databases.updateDocument(
+                        appwriteConfig.databaseId,
+                        appwriteConfig.userAddressesCollectionId,
+                        addr.$id,
+                        { is_default: false }
+                    );
+                }
+            }
+        }
+
+        // Create new address
+        const doc = await databases.createDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.userAddressesCollectionId,
+            ID.unique(),
+            {
+                user_id: userId,
+                street: address.street,
+                city: address.city,
+                country: address.country,
+                full_address: address.fullAddress,
+                is_default: address.isDefault ?? false,
+            }
+        );
+        
+        return doc;
+    } catch (error: any) {
+        console.error('❌ Save address error:', error);
+        throw new Error(error.message || 'Failed to save address');
+    }
+};
+
+/**
+ * Cập nhật địa chỉ
+ */
+export const updateUserAddress = async (addressId: string, address: {
+    street?: string;
+    city?: string;
+    country?: string;
+    fullAddress?: string;
+}) => {
+    try {
+        const updateData: any = {};
+        
+        if (address.street !== undefined) updateData.street = address.street;
+        if (address.city !== undefined) updateData.city = address.city;
+        if (address.country !== undefined) updateData.country = address.country;
+        if (address.fullAddress !== undefined) updateData.full_address = address.fullAddress;
+
+        const doc = await databases.updateDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.userAddressesCollectionId,
+            addressId,
+            updateData
+        );
+        
+        return doc;
+    } catch (error: any) {
+        console.error('❌ Update address error:', error);
+        throw new Error(error.message || 'Failed to update address');
+    }
+};
+
+/**
+ * Xóa địa chỉ
+ */
+export const deleteUserAddress = async (addressId: string) => {
+    try {
+        await databases.deleteDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.userAddressesCollectionId,
+            addressId
+        );
+        
+        console.log('✅ Address deleted');
+    } catch (error: any) {
+        console.error('❌ Delete address error:', error);
+        throw new Error(error.message || 'Failed to delete address');
+    }
+};
+
+/**
+ * Set địa chỉ làm default
+ */
+export const setDefaultAddress = async (userId: string, addressId: string) => {
+    try {
+        // Unset all existing defaults
+        const existingAddresses = await getUserAddresses(userId);
+        
+        for (const addr of existingAddresses) {
+            if (addr.is_default && addr.$id !== addressId) {
+                await databases.updateDocument(
+                    appwriteConfig.databaseId,
+                    appwriteConfig.userAddressesCollectionId,
+                    addr.$id,
+                    { is_default: false }
+                );
+            }
+        }
+
+        // Set new default
+        await databases.updateDocument(
+            appwriteConfig.databaseId,
+            appwriteConfig.userAddressesCollectionId,
+            addressId,
+            { is_default: true }
+        );
+        
+        console.log('✅ Default address set');
+    } catch (error: any) {
+        console.error('❌ Set default address error:', error);
+        throw new Error(error.message || 'Failed to set default address');
     }
 };

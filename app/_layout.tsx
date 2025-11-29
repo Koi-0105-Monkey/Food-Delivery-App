@@ -5,25 +5,19 @@ import { useEffect} from "react";
 import './globals.css';
 import * as Sentry from '@sentry/react-native';
 import useAuthStore from "@/store/auth.store";
+import { useCartStore } from "@/store/cart.store";
 
 Sentry.init({
   dsn: 'https://94edd17ee98a307f2d85d750574c454a@o4506876178464768.ingest.us.sentry.io/4509588544094208',
-
-  // Adds more context data to events (IP address, cookies, user, etc.)
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
   sendDefaultPii: true,
-
-  // Configure Session Replay
   replaysSessionSampleRate: 1,
   replaysOnErrorSampleRate: 1,
   integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
-
-  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
-  // spotlight: __DEV__,
 });
 
 export default Sentry.wrap(function RootLayout() {
-  const { isLoading, fetchAuthenticatedUser } = useAuthStore();
+  const { isLoading, fetchAuthenticatedUser, user } = useAuthStore();
+  const { loadCartFromServer } = useCartStore();
 
   const [fontsLoaded, error] = useFonts({
     "QuickSand-Bold": require('../assets/fonts/Quicksand-Bold.ttf'),
@@ -39,8 +33,15 @@ export default Sentry.wrap(function RootLayout() {
   }, [fontsLoaded, error]);
 
   useEffect(() => {
-    fetchAuthenticatedUser()
+    fetchAuthenticatedUser();
   }, []);
+
+  // Load cart when user is authenticated
+  useEffect(() => {
+    if (user) {
+      loadCartFromServer();
+    }
+  }, [user]);
 
   if(!fontsLoaded || isLoading) return null;
 
