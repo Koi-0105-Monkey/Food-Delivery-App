@@ -197,3 +197,10 @@ envEXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyC...
 cài thêm 
 npx expo install react-native-webview
 ở nhánh feature/signin
+
++ ở nhánh feature/edit-profile
+Appwwrite: thêm collum phone 
+nhập lệnh terminal: npx expo install expo-image-picker
+
++ở nhánh feature/product-detail
+nhập lệnh terminal: npx expo install expo-haptics
