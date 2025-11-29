@@ -20,7 +20,20 @@ export interface User extends Models.Document {
     name: string;
     email: string;
     avatar: string;
-    phone: string; // Thêm field phone (optional)
+    phone: string;
+}
+
+export interface Address {
+    $id?: string;
+    street: string;
+    city: string;
+    country: string;
+    fullAddress: string;
+    isDefault: boolean;
+    coordinates?: {
+        latitude: number;
+        longitude: number;
+    };
 }
 
 export interface CartCustomization {
@@ -45,7 +58,8 @@ export interface CartStore {
     removeItem: (id: string, customizations: CartCustomization[]) => void;
     increaseQty: (id: string, customizations: CartCustomization[]) => void;
     decreaseQty: (id: string, customizations: CartCustomization[]) => void;
-    clearCart: () => void;
+    clearCart: () => Promise<void>;
+    loadCartFromServer: () => Promise<void>; // 👈 Thêm method mới
     getTotalItems: () => number;
     getTotalPrice: () => number;
 }

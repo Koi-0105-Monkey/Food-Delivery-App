@@ -6,8 +6,10 @@ import { useAddressStore } from '@/store/address.store';
 import { images } from '@/constants';
 import { router } from 'expo-router';
 import { account } from '@/lib/appwrite';
-import AddressModal from '@/components/AddressModal';
+import AddressListModal from '@/components/AddressListModal';
+import AddEditAddressModal from '@/components/AddEditAddressModal';
 import EditProfileModal from '@/components/EditProfileModal';
+import { Address } from '@/store/address.store';
 
 const ProfileField = ({ label, value, icon }: { label: string; value: string; icon: any }) => (
     <View className="profile-field">
@@ -23,15 +25,17 @@ const ProfileField = ({ label, value, icon }: { label: string; value: string; ic
 
 const Profile = () => {
     const { user, setIsAuthenticated, setUser } = useAuthStore();
-    const { address, getDisplayAddress, fetchAddress } = useAddressStore();
+    const { defaultAddress, getDisplayAddress, fetchAddresses } = useAddressStore();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
-    const [showAddressModal, setShowAddressModal] = useState(false);
+    const [showAddressListModal, setShowAddressListModal] = useState(false);
+    const [showAddEditModal, setShowAddEditModal] = useState(false);
+    const [editingAddress, setEditingAddress] = useState<Address | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
 
     // Load địa chỉ khi vào profile
     useEffect(() => {
         if (user) {
-            fetchAddress();
+            fetchAddresses();
         }
     }, [user]);
 
@@ -66,16 +70,41 @@ const Profile = () => {
     };
 
     const openGoogleMaps = () => {
-        if (!address?.fullAddress) {
+        if (!defaultAddress?.fullAddress) {
             return Alert.alert('No Address', 'Please set your delivery address first.');
         }
 
-        const encodedAddress = encodeURIComponent(address.fullAddress);
+        const encodedAddress = encodeURIComponent(defaultAddress.fullAddress);
         const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
 
         Linking.openURL(mapsUrl).catch(() => {
             Alert.alert('Error', 'Unable to open Google Maps');
         });
+    };
+
+    const handleAddNewAddress = () => {
+        setShowAddressListModal(false);
+        setEditingAddress(null);
+        setTimeout(() => {
+            setShowAddEditModal(true);
+        }, 300);
+    };
+
+    const handleEditAddress = (address: Address) => {
+        setShowAddressListModal(false);
+        setEditingAddress(address);
+        setTimeout(() => {
+            setShowAddEditModal(true);
+        }, 300);
+    };
+
+    const handleCloseAddEditModal = () => {
+        setShowAddEditModal(false);
+        setEditingAddress(null);
+        setTimeout(() => {
+            fetchAddresses();
+            setShowAddressListModal(true);
+        }, 300);
     };
 
     return (
@@ -135,11 +164,17 @@ const Profile = () => {
                         icon={images.phone}
                     />
 
-                    <ProfileField
-                        label="Delivery Address"
-                        value={address?.fullAddress || 'Not set'}
-                        icon={images.location}
-                    />
+                    <View className="profile-field">
+                        <View className="profile-field__icon">
+                            <Image source={images.location} className="size-6" resizeMode="contain" tintColor="#FE8C00" />
+                        </View>
+                        <View className="flex-1">
+                            <Text className="body-medium text-gray-200">Default Delivery Address</Text>
+                            <Text className="paragraph-semibold text-dark-100" numberOfLines={3}>
+                                {defaultAddress?.fullAddress || 'Not set'}
+                            </Text>
+                        </View>
+                    </View>
                 </View>
 
                 {/* Action Buttons */}
@@ -163,10 +198,10 @@ const Profile = () => {
                         <Image source={images.arrowRight} className="size-5" resizeMode="contain" />
                     </TouchableOpacity>
 
-                    {/* Update Address */}
+                    {/* Manage Addresses */}
                     <TouchableOpacity
                         className="bg-white border border-gray-200 rounded-2xl p-5 flex-row items-center justify-between"
-                        onPress={() => setShowAddressModal(true)}
+                        onPress={() => setShowAddressListModal(true)}
                     >
                         <View className="flex-row items-center gap-3">
                             <View className="size-12 rounded-full bg-primary/10 flex-center">
@@ -178,14 +213,14 @@ const Profile = () => {
                                 />
                             </View>
                             <Text className="paragraph-semibold text-dark-100">
-                                Update Address
+                                Manage Addresses
                             </Text>
                         </View>
                         <Image source={images.arrowRight} className="size-5" resizeMode="contain" />
                     </TouchableOpacity>
 
                     {/* View on Google Maps */}
-                    {address && (
+                    {defaultAddress && (
                         <TouchableOpacity
                             className="bg-white border border-gray-200 rounded-2xl p-5 flex-row items-center justify-between"
                             onPress={openGoogleMaps}
@@ -267,14 +302,22 @@ const Profile = () => {
                 onClose={() => setShowEditModal(false)}
             />
 
-            {/* Address Modal */}
-            <AddressModal
-                visible={showAddressModal}
+            {/* Address List Modal */}
+            <AddressListModal
+                visible={showAddressListModal}
                 onClose={() => {
-                    setShowAddressModal(false);
-                    // Refresh address sau khi đóng modal
-                    fetchAddress();
+                    setShowAddressListModal(false);
+                    fetchAddresses();
                 }}
+                onAddNew={handleAddNewAddress}
+                onEdit={handleEditAddress}
+            />
+
+            {/* Add/Edit Address Modal */}
+            <AddEditAddressModal
+                visible={showAddEditModal}
+                onClose={handleCloseAddEditModal}
+                editAddress={editingAddress}
             />
         </SafeAreaView>
     );

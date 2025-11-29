@@ -13,33 +13,40 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { images } from '@/constants';
-import { useAddressStore } from '@/store/address.store';
+import { useAddressStore, Address } from '@/store/address.store';
 
-interface AddressModalProps {
+interface AddEditAddressModalProps {
     visible: boolean;
     onClose: () => void;
+    editAddress?: Address | null;
 }
 
-const AddressModal = ({ visible, onClose }: AddressModalProps) => {
+const AddEditAddressModal = ({ visible, onClose, editAddress }: AddEditAddressModalProps) => {
     const slideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
-    const { setAddress, address } = useAddressStore();
+    const { addAddress, updateAddress } = useAddressStore();
 
     const [form, setForm] = useState({
-        street: address?.street || '',
-        city: address?.city || '',
-        country: address?.country || '',
+        street: '',
+        city: '',
+        country: '',
     });
-    const [isValidating, setIsValidating] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const isEditMode = !!editAddress;
 
     useEffect(() => {
         if (visible) {
-            // Reset form với địa chỉ hiện tại
-            setForm({
-                street: address?.street || '',
-                city: address?.city || '',
-                country: address?.country || '',
-            });
+            // Reset form hoặc load data nếu edit
+            if (editAddress) {
+                setForm({
+                    street: editAddress.street || '',
+                    city: editAddress.city || '',
+                    country: editAddress.country || '',
+                });
+            } else {
+                setForm({ street: '', city: '', country: '' });
+            }
 
             // Animate in
             Animated.parallel([
@@ -59,7 +66,7 @@ const AddressModal = ({ visible, onClose }: AddressModalProps) => {
             slideAnim.setValue(Dimensions.get('window').height);
             opacityAnim.setValue(0);
         }
-    }, [visible]);
+    }, [visible, editAddress]);
 
     const handleClose = () => {
         Animated.parallel([
@@ -78,60 +85,52 @@ const AddressModal = ({ visible, onClose }: AddressModalProps) => {
         });
     };
 
-    const handleSave = async () => {
+    const handleSubmit = async () => {
         // Validation
         if (!form.city.trim() || !form.country.trim()) {
             return Alert.alert('Error', 'Please enter at least city and country.');
         }
 
-        setIsValidating(true);
+        setIsSubmitting(true);
 
         try {
-            // Tạo full address để search trên Google Maps
-            const fullAddress = [
-                form.street,
-                form.city,
-                form.country,
-            ]
+            const fullAddress = [form.street, form.city, form.country]
                 .filter(Boolean)
                 .join(', ');
 
-            // Optional: Gọi Google Geocoding API để lấy tọa độ
-            // (Cần Google API Key - tạm thời bỏ qua)
-            const coordinates = undefined;
+            if (isEditMode && editAddress?.$id) {
+                // Update
+                await updateAddress(editAddress.$id, {
+                    street: form.street.trim(),
+                    city: form.city.trim(),
+                    country: form.country.trim(),
+                    fullAddress,
+                });
+                Alert.alert('Success', 'Address updated!');
+            } else {
+                // Add new
+                await addAddress({
+                    street: form.street.trim(),
+                    city: form.city.trim(),
+                    country: form.country.trim(),
+                    fullAddress,
+                });
+                Alert.alert('Success', 'Address added!');
+            }
 
-            // Lưu địa chỉ
-            setAddress({
-                street: form.street.trim(),
-                city: form.city.trim(),
-                country: form.country.trim(),
-                fullAddress,
-                coordinates,
-            });
-
-            Alert.alert('Success', 'Delivery address updated!');
             handleClose();
         } catch (error) {
             Alert.alert('Error', 'Failed to save address. Please try again.');
         } finally {
-            setIsValidating(false);
+            setIsSubmitting(false);
         }
     };
 
     if (!visible) return null;
 
     return (
-        <Modal
-            visible={visible}
-            transparent
-            animationType="none"
-            onRequestClose={handleClose}
-        >
-            <TouchableOpacity
-                style={{ flex: 1 }}
-                activeOpacity={1}
-                onPress={handleClose}
-            >
+        <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
+            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={handleClose}>
                 <Animated.View
                     style={{
                         flex: 1,
@@ -173,7 +172,7 @@ const AddressModal = ({ visible, onClose }: AddressModalProps) => {
                         }}
                     >
                         <Text className="h3-bold text-dark-100">
-                            Delivery Address
+                            {isEditMode ? 'Edit Address' : 'Add New Address'}
                         </Text>
                         <TouchableOpacity onPress={handleClose}>
                             <Image
@@ -185,7 +184,10 @@ const AddressModal = ({ visible, onClose }: AddressModalProps) => {
                     </View>
 
                     <Text className="paragraph-medium text-gray-200 mb-6">
-                        Enter your delivery address to get food delivered right to your door! 🏠
+                        {isEditMode 
+                            ? 'Update your delivery address details 📝'
+                            : 'Add a new delivery address to get food delivered right to your door! 🏠'
+                        }
                     </Text>
 
                     {/* Icon */}
@@ -201,7 +203,7 @@ const AddressModal = ({ visible, onClose }: AddressModalProps) => {
                             }}
                         >
                             <Image
-                                source={images.location}
+                                source={isEditMode ? images.pencil : images.location}
                                 style={{ width: 40, height: 40 }}
                                 resizeMode="contain"
                                 tintColor="#FE8C00"
@@ -254,10 +256,10 @@ const AddressModal = ({ visible, onClose }: AddressModalProps) => {
                         </View>
                     </View>
 
-                    {/* Save Button */}
+                    {/* Submit Button */}
                     <TouchableOpacity
-                        onPress={handleSave}
-                        disabled={isValidating}
+                        onPress={handleSubmit}
+                        disabled={isSubmitting}
                         style={{
                             backgroundColor: '#FE8C00',
                             borderRadius: 25,
@@ -266,11 +268,11 @@ const AddressModal = ({ visible, onClose }: AddressModalProps) => {
                             marginTop: 30,
                         }}
                     >
-                        {isValidating ? (
+                        {isSubmitting ? (
                             <ActivityIndicator color="white" />
                         ) : (
                             <Text className="base-bold text-white">
-                                Save Address
+                                {isEditMode ? 'Update Address' : 'Add Address'}
                             </Text>
                         )}
                     </TouchableOpacity>
@@ -280,4 +282,4 @@ const AddressModal = ({ visible, onClose }: AddressModalProps) => {
     );
 };
 
-export default AddressModal;
+export default AddEditAddressModal;
