@@ -6,40 +6,64 @@ import { useLocalSearchParams, router } from 'expo-router';
 
 import CartButton from '@/components/CartButton';
 import SuccessModal from '@/components/SuccessModal';
-import AddressModal from '@/components/AddressModal';
+import AddressListModal from '@/components/AddressListModal';
+import AddEditAddressModal from '@/components/AddEditAddressModal';
 import { images, offers } from '@/constants';
 import useAuthStore from '@/store/auth.store';
-import { useAddressStore } from '@/store/address.store';
-
+import { useAddressStore, Address } from '@/store/address.store';
 
 export default function Index() {
     const { user } = useAuthStore();
-    const { getDisplayAddress, fetchAddress } = useAddressStore();
+    const { getDisplayAddress, fetchAddresses } = useAddressStore();
     const params = useLocalSearchParams<{ showWelcome?: string }>();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
-    const [showAddressModal, setShowAddressModal] = useState(false);
+    const [showAddressListModal, setShowAddressListModal] = useState(false);
+    const [showAddEditModal, setShowAddEditModal] = useState(false);
+    const [editingAddress, setEditingAddress] = useState<Address | null>(null);
     const [modalType, setModalType] = useState<'signup' | 'signin'>('signin');
 
     useEffect(() => {
         // Hiện modal cho cả signin và signup
         if (params.showWelcome === 'signin' || params.showWelcome === 'signup') {
             setModalType(params.showWelcome);
-
-            // Delay để UI render
             setTimeout(() => {
                 setShowSuccessModal(true);
             }, 300);
-
-            // Clear param
             router.setParams({ showWelcome: undefined });
         }
     }, [params.showWelcome]);
 
     useEffect(() => {
         if (user) {
-            fetchAddress();
+            fetchAddresses();
         }
     }, [user]);
+
+    const handleAddNewAddress = () => {
+        setShowAddressListModal(false);
+        setEditingAddress(null);
+        setTimeout(() => {
+            setShowAddEditModal(true);
+        }, 300);
+    };
+
+    const handleEditAddress = (address: Address) => {
+        setShowAddressListModal(false);
+        setEditingAddress(address);
+        setTimeout(() => {
+            setShowAddEditModal(true);
+        }, 300);
+    };
+
+    const handleCloseAddEditModal = () => {
+        setShowAddEditModal(false);
+        setEditingAddress(null);
+        // Refresh addresses và quay lại list
+        setTimeout(() => {
+            fetchAddresses();
+            setShowAddressListModal(true);
+        }, 300);
+    };
 
     return (
         <SafeAreaView className="flex-1 bg-white">
@@ -89,7 +113,7 @@ export default function Index() {
                             <Text className="small-bold text-primary">DELIVER TO</Text>
                             <TouchableOpacity
                                 className="flex-center flex-row gap-x-1 mt-0.5"
-                                onPress={() => setShowAddressModal(true)}
+                                onPress={() => setShowAddressListModal(true)}
                             >
                                 <Text className="paragraph-bold text-dark-100">
                                     {getDisplayAddress()}
@@ -120,10 +144,22 @@ export default function Index() {
                 type={modalType}
             />
 
-            {/* Address Modal */}
-            <AddressModal
-                visible={showAddressModal}
-                onClose={() => setShowAddressModal(false)}
+            {/* Address List Modal */}
+            <AddressListModal
+                visible={showAddressListModal}
+                onClose={() => {
+                    setShowAddressListModal(false);
+                    fetchAddresses(); // Refresh sau khi đóng
+                }}
+                onAddNew={handleAddNewAddress}
+                onEdit={handleEditAddress}
+            />
+
+            {/* Add/Edit Address Modal */}
+            <AddEditAddressModal
+                visible={showAddEditModal}
+                onClose={handleCloseAddEditModal}
+                editAddress={editingAddress}
             />
         </SafeAreaView>
     );
