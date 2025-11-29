@@ -204,3 +204,6 @@ nhập lệnh terminal: npx expo install expo-image-picker
 
 +ở nhánh feature/product-detail
 nhập lệnh terminal: npx expo install expo-haptics
+
++ ở nhánh feature/cart_items
+sửa bảng menu_id (cái bảng có relationship) thành menu_id - string - required - 255
