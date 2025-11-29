@@ -7,12 +7,12 @@ const FormData = require('form-data');
 
 // ========== CẤU HÌNH APPWRITE ==========
 // Hardcode API Key trực tiếp
-const API_KEY = 'standard_c9f94d4e2c13a8df7325ae8914bdb6c4f17d92af7461d2bae9e4cc0bdac9395bbabfd5b87f9ab9eb596c1ea9cac286442d954c5fec5eb795f47879bce69539ed12224544b1d5f50d597536a8a06c50df0bddbd91f6c8b0aca3739eb2b2131fd89bf1b7bc86585cdd52c161e22cb602278e5d45d7b87ebbdfdee3be3b8d1df7a1';
+const API_KEY = 'standard_13b9401fd29684bb5adb80d060c6ef703af46eeca76b456181289fdd9ece957a20503d8ef46bfa42bd82aa48433f58181fe12aa42cb8b41066441ea00478cc811cdd4864ceb7c8d7003bdf39a017f5f1842f5963637733fb93b8be984fb4da391f118291ffba6599291c25215468597da58b678716fd41b35e6a240095c95dd1';
 
 // ⚠️ THAY ĐỔI endpoint theo region của bạn
 // Kiểm tra trong Appwrite Console > Settings > Endpoint
-const ENDPOINT = 'https://sgp.cloud.appwrite.io/v1'; // hoặc region khác của bạn
-const PROJECT_ID = '6927c3e3000eb4b8dcce';
+const ENDPOINT = 'https://nyc.cloud.appwrite.io/v1'; // hoặc region khác của bạn
+const PROJECT_ID = '69230ad2001fb8f2aee4';
 
 const client = new sdk.Client()
     .setEndpoint(ENDPOINT)
@@ -23,12 +23,13 @@ const databases = new sdk.Databases(client);
 const storage = new sdk.Storage(client);
 
 // Sử dụng đúng config từ appwrite.ts
-const DATABASE_ID = '6927c468001041ff0fc7';
-const CATEGORIES_COLLECTION_ID = 'categories';
-const CUSTOMIZATIONS_COLLECTION_ID = 'custamizations';
+const DATABASE_ID = '68629ae60038a7c61fe4';
+const CATEGORIES_COLLECTION_ID = '692315a6001ae62780a0';
+const CUSTOMIZATIONS_COLLECTION_ID = 'customizations';
 const MENU_COLLECTION_ID = 'menu';
 const MENU_CUSTOMIZATIONS_COLLECTION_ID = 'menu_customizations';
-const BUCKET_ID = '6927c9b60006fc984a45';
+const BUCKET_ID = '692334a700377dae1061';
+
 
 // ========== DỮ LIỆU ==========
 const dummyData = {
@@ -64,158 +65,172 @@ const dummyData = {
 
     menu: [
         {
-            name: "Classic Cheeseburger",
-            description: "Beef patty, cheese, lettuce, tomato",
-            image_url: "https://static.vecteezy.com/system/resources/previews/044/844/600/large_2x/homemade-fresh-tasty-burger-with-meat-and-cheese-classic-cheese-burger-and-vegetable-ai-generated-free-png.png",
-            price: 25.99,
+            name: "Classic Cheese Burger",
+            description: "Beef patty, cheese, lettuce, tomatoes",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/044/844/600/large_2x/homemade-fresh-tasty-burger-with-meat-and-cheese-classic-cheese-burger-and-vegetable-ai-generated-free-png.png",
+            price: 45000,
             rating: 4.5,
             calories: 550,
             protein: 25,
             category_name: "Burgers",
-            customizations: ["Extra Cheese", "Coke", "Fries", "Onions", "Bacon"],
+            customizations: ["Extra Cheese", "Coca Cola", "French Fries", "Onions", "Bacon"],
         },
         {
             name: "Pepperoni Pizza",
-            description: "Loaded with cheese and pepperoni slices",
-            image_url: "https://static.vecteezy.com/system/resources/previews/023/742/417/large_2x/pepperoni-pizza-isolated-illustration-ai-generative-free-png.png",
-            price: 30.99,
+            description: "Cheesy pizza topped with pepperoni",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/023/742/417/large_2x/pepperoni-pizza-isolated-illustration-ai-generative-free-png.png",
+            price: 89000,
             rating: 4.7,
             calories: 700,
             protein: 30,
             category_name: "Pizzas",
-            customizations: ["Extra Cheese", "Jalapeños", "Garlic Bread", "Coke", "Olives"],
+            customizations: ["Extra Cheese", "Jalapeño", "Garlic Bread", "Coca Cola", "Olives"],
         },
         {
             name: "Bean Burrito",
-            description: "Stuffed with beans, rice, salsa",
-            image_url: "https://static.vecteezy.com/system/resources/previews/055/133/581/large_2x/deliciously-grilled-burritos-filled-with-beans-corn-and-fresh-vegetables-served-with-lime-wedge-and-cilantro-isolated-on-transparent-background-free-png.png",
-            price: 20.99,
+            description: "Burrito stuffed with beans, rice, and salsa",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/055/133/581/large_2x/deliciously-grilled-burritos-filled-with-beans-corn-and-fresh-vegetables-served-with-lime-wedge-and-cilantro-isolated-on-transparent-background-free-png.png",
+            price: 39000,
             rating: 4.2,
             calories: 480,
             protein: 18,
             category_name: "Burritos",
-            customizations: ["Jalapeños", "Iced Tea", "Fries", "Salad"],
+            customizations: ["Jalapeño", "Lemon Iced Tea", "French Fries", "Salad"],
         },
         {
             name: "BBQ Bacon Burger",
-            description: "Smoky BBQ sauce, crispy bacon, cheddar",
-            image_url: "https://static.vecteezy.com/system/resources/previews/060/236/245/large_2x/a-large-hamburger-with-cheese-onions-and-lettuce-free-png.png",
-            price: 27.5,
+            description: "Smoky BBQ sauce, crispy bacon, cheddar cheese",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/060/236/245/large_2x/a-large-hamburger-with-cheese-onions-and-lettuce-free-png.png",
+            price: 55000,
             rating: 4.8,
             calories: 650,
             protein: 29,
             category_name: "Burgers",
-            customizations: ["Onions", "Fries", "Coke", "Bacon", "Avocado"],
+            customizations: ["Onions", "French Fries", "Coca Cola", "Bacon", "Avocado"],
         },
         {
-            name: "Chicken Caesar Wrap",
+            name: "Caesar Chicken Wrap",
             description: "Grilled chicken, lettuce, Caesar dressing",
-            image_url: "https://static.vecteezy.com/system/resources/previews/048/930/603/large_2x/caesar-wrap-grilled-chicken-isolated-on-transparent-background-free-png.png",
-            price: 21.5,
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/048/930/603/large_2x/caesar-wrap-grilled-chicken-isolated-on-transparent-background-free-png.png",
+            price: 42000,
             rating: 4.4,
             calories: 490,
             protein: 28,
             category_name: "Wraps",
-            customizations: ["Extra Cheese", "Coke", "Potato Wedges", "Tomatoes"],
+            customizations: ["Extra Cheese", "Coca Cola", "Potato Chips", "Tomatoes"],
         },
         {
             name: "Grilled Veggie Sandwich",
-            description: "Roasted veggies, pesto, cheese",
-            image_url: "https://static.vecteezy.com/system/resources/previews/047/832/012/large_2x/grilled-sesame-seed-bread-veggie-sandwich-with-tomato-and-onion-free-png.png",
-            price: 19.99,
+            description: "Grilled vegetables, pesto, cheese",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/047/832/012/large_2x/grilled-sesame-seed-bread-veggie-sandwich-with-tomato-and-onion-free-png.png",
+            price: 38000,
             rating: 4.1,
             calories: 420,
             protein: 19,
             category_name: "Sandwiches",
-            customizations: ["Mushrooms", "Olives", "Mozzarella Sticks", "Iced Tea"],
+            customizations: ["Mushrooms", "Olives", "Cheese Sticks", "Lemon Iced Tea"],
         },
         {
-            name: "Double Patty Burger",
+            name: "Double Beef Burger",
             description: "Two juicy beef patties and cheese",
-            image_url: "https://static.vecteezy.com/system/resources/previews/060/359/627/large_2x/double-cheeseburger-with-lettuce-tomatoes-cheese-and-sesame-bun-free-png.png",
-            price: 32.99,
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/060/359/627/large_2x/double-cheeseburger-with-lettuce-tomatoes-cheese-and-sesame-bun-free-png.png",
+            price: 69000,
             rating: 4.9,
             calories: 720,
             protein: 35,
             category_name: "Burgers",
-            customizations: ["Extra Cheese", "Onions", "Fries", "Coke", "Chicken Nuggets"],
+            customizations: ["Extra Cheese", "Onions", "French Fries", "Coca Cola", "Chicken Bites"],
         },
         {
             name: "Paneer Tikka Wrap",
-            description: "Spicy paneer, mint chutney, veggies",
-            image_url: "https://static.vecteezy.com/system/resources/previews/057/913/530/large_2x/delicious-wraps-a-tantalizing-array-of-wraps-filled-with-vibrant-vegetables-succulent-fillings-and-fresh-ingredients-artfully-arranged-for-a-mouthwatering-culinary-experience-free-png.png",
-            price: 23.99,
+            description: "Spicy paneer, mint sauce, mixed vegetables",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/057/913/530/large_2x/delicious-wraps-a-tantalizing-array-of-wraps-filled-with-vibrant-vegetables-succulent-fillings-and-fresh-ingredients-artfully-arranged-for-a-mouthwatering-culinary-experience-free-png.png",
+            price: 48000,
             rating: 4.6,
             calories: 470,
             protein: 20,
             category_name: "Wraps",
-            customizations: ["Jalapeños", "Tomatoes", "Salad", "Fries", "Iced Tea"],
+            customizations: ["Jalapeño", "Tomatoes", "Salad", "French Fries", "Lemon Iced Tea"],
         },
         {
             name: "Mexican Burrito Bowl",
-            description: "Rice, beans, corn, guac, salsa",
-            image_url: "https://static.vecteezy.com/system/resources/previews/057/466/374/large_2x/healthy-quinoa-bowl-with-avocado-tomato-and-black-beans-ingredients-free-png.png",
-            price: 26.49,
+            description: "Rice, beans, corn, avocado, salsa",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/057/466/374/large_2x/healthy-quinoa-bowl-with-avocado-tomato-and-black-beans-ingredients-free-png.png",
+            price: 52000,
             rating: 4.7,
             calories: 610,
             protein: 24,
             category_name: "Bowls",
-            customizations: ["Avocado", "Sweet Corn", "Salad", "Iced Tea"],
+            customizations: ["Avocado", "Sweet Corn", "Salad", "Lemon Iced Tea"],
         },
         {
             name: "Spicy Chicken Sandwich",
             description: "Crispy chicken, spicy sauce, pickles",
-            image_url: "https://static.vecteezy.com/system/resources/previews/051/814/008/large_2x/a-grilled-chicken-sandwich-with-lettuce-and-tomatoes-free-png.png",
-            price: 24.99,
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/051/814/008/large_2x/a-grilled-chicken-sandwich-with-lettuce-and-tomatoes-free-png.png",
+            price: 49000,
             rating: 4.3,
             calories: 540,
             protein: 26,
             category_name: "Sandwiches",
-            customizations: ["Jalapeños", "Onions", "Fries", "Coke", "Choco Lava Cake"],
+            customizations: ["Jalapeño", "Onions", "French Fries", "Coca Cola", "Chocolate Lava Cake"],
         },
         {
             name: "Classic Margherita Pizza",
-            description: "Tomato, mozzarella, fresh basil",
-            image_url: "https://static.vecteezy.com/system/resources/previews/058/700/845/large_2x/free-isolated-on-transparent-background-delicious-pizza-topped-with-fresh-tomatoes-basil-and-melted-cheese-perfect-for-food-free-png.png",
-            price: 26.99,
+            description: "Tomatoes, mozzarella cheese, fresh basil",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/058/700/845/large_2x/free-isolated-on-transparent-background-delicious-pizza-topped-with-fresh-tomatoes-basil-and-melted-cheese-perfect-for-food-free-png.png",
+            price: 75000,
             rating: 4.1,
             calories: 590,
             protein: 21,
             category_name: "Pizzas",
-            customizations: ["Extra Cheese", "Olives", "Coke", "Garlic Bread"],
+            customizations: ["Extra Cheese", "Olives", "Coca Cola", "Garlic Bread"],
         },
         {
-            name: "Protein Power Bowl",
-            description: "Grilled chicken, quinoa, veggies",
-            image_url: "https://static.vecteezy.com/system/resources/previews/056/106/379/large_2x/top-view-salad-with-chicken-avocado-tomatoes-and-lettuce-free-png.png",
-            price: 29.99,
+            name: "Protein Bowl",
+            description: "Grilled chicken, quinoa, mixed vegetables",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/056/106/379/large_2x/top-view-salad-with-chicken-avocado-tomatoes-and-lettuce-free-png.png",
+            price: 62000,
             rating: 4.8,
             calories: 580,
             protein: 38,
             category_name: "Bowls",
-            customizations: ["Avocado", "Salad", "Sweet Corn", "Iced Tea"],
+            customizations: ["Avocado", "Salad", "Sweet Corn", "Lemon Iced Tea"],
         },
         {
             name: "Paneer Burrito",
-            description: "Paneer cubes, spicy masala, rice, beans",
-            image_url: "https://static.vecteezy.com/system/resources/previews/056/565/254/large_2x/burrito-with-cauliflower-and-vegetables-free-png.png",
-            price: 24.99,
+            description: "Paneer, masala spices, rice, beans",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/056/565/254/large_2x/burrito-with-cauliflower-and-vegetables-free-png.png",
+            price: 49000,
             rating: 4.2,
             calories: 510,
             protein: 22,
             category_name: "Burritos",
-            customizations: ["Jalapeños", "Fries", "Garlic Bread", "Coke"],
+            customizations: ["Jalapeño", "French Fries", "Garlic Bread", "Coca Cola"],
         },
         {
             name: "Chicken Club Sandwich",
-            description: "Grilled chicken, lettuce, cheese, tomato",
-            image_url: "https://static.vecteezy.com/system/resources/previews/060/364/135/large_2x/a-flavorful-club-sandwich-with-turkey-bacon-and-fresh-vegetables-sliced-and-isolated-on-a-transparent-background-free-png.png",
-            price: 27.49,
+            description: "Grilled chicken, lettuce, cheese, tomatoes",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/060/364/135/large_2x/a-flavorful-club-sandwich-with-turkey-bacon-and-fresh-vegetables-sliced-and-isolated-on-a-transparent-background-free-png.png",
+            price: 54000,
             rating: 4.5,
             calories: 610,
             protein: 31,
             category_name: "Sandwiches",
-            customizations: ["Bacon", "Tomatoes", "Mozzarella Sticks", "Iced Tea"],
+            customizations: ["Bacon", "Tomatoes", "Cheese Sticks", "Lemon Iced Tea"],
         },
     ],
 };

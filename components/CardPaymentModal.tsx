@@ -159,12 +159,12 @@ const CardPaymentModal = ({
         if (!validateCard()) return;
 
         Alert.alert(
-            'Confirm Payment',
-            `Charge $${totalAmount.toFixed(2)} to card ending in ${cardData.cardNumber.slice(-4)}?`,
+            'Xác nhận thanh toán',
+            `Thanh toán ${totalAmount.toLocaleString('vi-VN')}đ bằng thẻ số ${cardData.cardNumber.slice(-4)}?`,
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: 'Hủy', style: 'cancel' },
                 {
-                    text: 'Pay Now',
+                    text: 'Thanh toán',
                     onPress: async () => {
                         setIsProcessing(true);
 
@@ -250,8 +250,8 @@ const CardPaymentModal = ({
                             alignItems: 'center',
                         }}
                     >
-                        <Text className="body-medium text-gray-200 mb-2">Total Amount</Text>
-                        <Text className="h1-bold text-primary">${totalAmount.toFixed(2)}</Text>
+                        <Text className="body-medium text-gray-200 mb-2">Tổng thanh toán</Text>
+                        <Text className="h1-bold text-primary">{totalAmount.toLocaleString('vi-VN')}đ</Text>
                     </View>
 
                     {/* Card Number */}
@@ -346,49 +346,54 @@ const CardPaymentModal = ({
                     {/* Card Preview */}
                     <View
                         style={{
-                            backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            backgroundColor: '#667eea',
                             borderRadius: 20,
                             padding: 20,
                             marginBottom: 30,
-                            minHeight: 180,
+                            minHeight: 200,
                             shadowColor: '#000',
                             shadowOffset: { width: 0, height: 4 },
                             shadowOpacity: 0.3,
                             shadowRadius: 10,
                             elevation: 10,
                         }}
-                        className="bg-primary"
                     >
-                        <Text className="body-medium text-white mb-2">💳 BANK CARD</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text className="body-medium text-white">💳 BANK CARD</Text>
+                            <Text className="small-bold text-white">VISA</Text>
+                        </View>
                         
-                        <View style={{ flex: 1, justifyContent: 'space-between' }}>
-                            <Text className="h3-bold text-white mt-8" style={{ letterSpacing: 2 }}>
+                        <View style={{ flex: 1, justifyContent: 'center', marginTop: 25 }}>
+                            <Text 
+                                className="h3-bold text-white" 
+                                style={{ letterSpacing: 3, fontSize: 20 }}
+                            >
                                 {cardData.cardNumber
                                     ? formatCardNumber(cardData.cardNumber)
                                     : '•••• •••• •••• ••••'}
                             </Text>
+                        </View>
 
-                            <View
-                                style={{
-                                    flexDirection: 'row',
-                                    justifyContent: 'space-between',
-                                    marginTop: 20,
-                                }}
-                            >
-                                <View>
-                                    <Text className="small-bold text-white opacity-70">CARD HOLDER</Text>
-                                    <Text className="paragraph-bold text-white">
-                                        {cardData.cardHolder || 'YOUR NAME'}
-                                    </Text>
-                                </View>
-                                <View>
-                                    <Text className="small-bold text-white opacity-70">EXPIRES</Text>
-                                    <Text className="paragraph-bold text-white">
-                                        {cardData.expiryMonth && cardData.expiryYear
-                                            ? `${cardData.expiryMonth}/${cardData.expiryYear}`
-                                            : 'MM/YY'}
-                                    </Text>
-                                </View>
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                marginTop: 25,
+                            }}
+                        >
+                            <View style={{ flex: 1 }}>
+                                <Text className="small-bold text-white opacity-70">CARD HOLDER</Text>
+                                <Text className="paragraph-semibold text-white mt-1" numberOfLines={1}>
+                                    {cardData.cardHolder || 'YOUR NAME'}
+                                </Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                                <Text className="small-bold text-white opacity-70">EXPIRES</Text>
+                                <Text className="paragraph-semibold text-white mt-1">
+                                    {cardData.expiryMonth && cardData.expiryYear
+                                        ? `${cardData.expiryMonth}/${cardData.expiryYear}`
+                                        : 'MM/YY'}
+                                </Text>
                             </View>
                         </View>
                     </View>
@@ -409,7 +414,7 @@ const CardPaymentModal = ({
                                 <ActivityIndicator color="white" />
                             ) : (
                                 <Text className="base-bold text-white">
-                                    💳 Pay ${totalAmount.toFixed(2)}
+                                    💳 Thanh toán {totalAmount.toLocaleString('vi-VN')}đ
                                 </Text>
                             )}
                         </TouchableOpacity>

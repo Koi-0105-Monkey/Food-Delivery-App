@@ -48,8 +48,8 @@ const Cart = () => {
 
     const totalItems = getTotalItems();
     const subtotal = getTotalPrice();
-    const deliveryFee = 5.0;
-    const discount = 0.5;
+    const deliveryFee = 15000; // 15,000 VND
+    const discount = 5000; // 5,000 VND
     const total = subtotal + deliveryFee - discount;
 
     const handleOrderNow = () => {
