@@ -1,4 +1,3 @@
-
 import { View, Text, Image, ScrollView, TouchableOpacity, Alert, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -69,19 +68,23 @@ const ProductDetail = () => {
                 [Query.equal('menu', id)]
             );
 
-            // Get full customization details
+            // 🔥 FIX: Lấy customization IDs và fetch riêng lẻ
             const customizationIds = menuCustomizations.documents.map(
                 (doc: any) => doc.customizations
             );
 
             if (customizationIds.length > 0) {
-                const customizationDocs = await databases.listDocuments(
-                    appwriteConfig.databaseId,
-                    appwriteConfig.customizationsCollectionId,
-                    [Query.equal('$id', customizationIds)]
+                // Fetch từng customization bằng getDocument
+                const customizationPromises = customizationIds.map(cusId =>
+                    databases.getDocument(
+                        appwriteConfig.databaseId,
+                        appwriteConfig.customizationsCollectionId,
+                        cusId
+                    )
                 );
 
-                setAvailableCustomizations(customizationDocs.documents);
+                const customizationDocs = await Promise.all(customizationPromises);
+                setAvailableCustomizations(customizationDocs);
             }
         } catch (error: any) {
             console.error('Failed to fetch product:', error);
@@ -182,6 +185,10 @@ const ProductDetail = () => {
     // Group customizations by type
     const toppings = availableCustomizations.filter(c => c.type === 'topping');
     const sides = availableCustomizations.filter(c => c.type === 'side');
+
+    // Separate selected toppings and sides
+    const selectedToppings = selectedCustomizations.filter(c => c.type === 'topping');
+    const selectedSides = selectedCustomizations.filter(c => c.type === 'side');
 
     return (
         <SafeAreaView className="bg-white h-full">
@@ -331,7 +338,7 @@ const ProductDetail = () => {
                             </View>
                         )}
 
-                        {/* ✅ FIX: Selected Customizations Summary - Đã thêm closing tag */}
+                        {/* Selected Customizations Summary */}
                         {selectedCustomizations.length > 0 && (
                             <View className="mb-6 bg-success/10 rounded-2xl p-4">
                                 <Text className="base-semibold text-dark-100 mb-2">
@@ -347,6 +354,66 @@ const ProductDetail = () => {
                                         </Text>
                                     </View>
                                 ))}
+                            </View>
+                        )}
+
+                        {/* 🆕 TOPPINGS DISPLAY SECTION - Hiển thị toppings đã chọn */}
+                        {selectedToppings.length > 0 && (
+                            <View className="mb-6 border-t border-gray-200 pt-6">
+                                <View className="flex-row items-center mb-3">
+                                    <View className="bg-primary/10 rounded-full p-2 mr-2">
+                                        <Text className="text-2xl">🍕</Text>
+                                    </View>
+                                    <Text className="base-bold text-dark-100">
+                                        Selected Toppings ({selectedToppings.length})
+                                    </Text>
+                                </View>
+                                
+                                <View className="flex-row flex-wrap gap-2">
+                                    {selectedToppings.map((topping) => (
+                                        <View
+                                            key={topping.id}
+                                            className="bg-primary/10 border border-primary rounded-xl px-4 py-2 flex-row items-center gap-2"
+                                        >
+                                            <Text className="paragraph-semibold text-primary">
+                                                {topping.name}
+                                            </Text>
+                                            <Text className="body-medium text-primary">
+                                                +${topping.price}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
+
+                        {/* 🆕 SIDES DISPLAY SECTION - Hiển thị sides đã chọn */}
+                        {selectedSides.length > 0 && (
+                            <View className="mb-6">
+                                <View className="flex-row items-center mb-3">
+                                    <View className="bg-success/10 rounded-full p-2 mr-2">
+                                        <Text className="text-2xl">🍟</Text>
+                                    </View>
+                                    <Text className="base-bold text-dark-100">
+                                        Selected Sides ({selectedSides.length})
+                                    </Text>
+                                </View>
+                                
+                                <View className="flex-row flex-wrap gap-2">
+                                    {selectedSides.map((side) => (
+                                        <View
+                                            key={side.id}
+                                            className="bg-success/10 border border-success rounded-xl px-4 py-2 flex-row items-center gap-2"
+                                        >
+                                            <Text className="paragraph-semibold text-success">
+                                                {side.name}
+                                            </Text>
+                                            <Text className="body-medium text-success">
+                                                +${side.price}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
                             </View>
                         )}
                     </View>
