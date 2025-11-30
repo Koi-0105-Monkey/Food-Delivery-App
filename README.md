@@ -207,3 +207,8 @@ nhập lệnh terminal: npx expo install expo-haptics
 
 + ở nhánh feature/cart_items
 sửa bảng menu_id (cái bảng có relationship) thành menu_id - string - required - 255
+
+
+npm install crypto-js
+npm install --save-dev @types/crypto-js
+npm install express
