@@ -178,8 +178,7 @@ export interface Order extends Models.Document {
 export interface CardPaymentData {
     cardNumber: string;
     cardHolder: string;
-    expiryMonth: string;
-    expiryYear: string;
+    expiryDate: string;  // ✅ Dùng format MM/YY (đơn giản hơn)
     cvv: string;
 }
 

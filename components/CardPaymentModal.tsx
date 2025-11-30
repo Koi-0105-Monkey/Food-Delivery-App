@@ -9,18 +9,24 @@ import {
     Dimensions,
     TouchableOpacity,
     Image,
-    ScrollView,
     TextInput,
+    ScrollView,
     Alert,
     ActivityIndicator,
 } from 'react-native';
 import { images } from '@/constants';
-import { CardPaymentData } from '@/type';
+
+export interface CardPaymentData {
+    cardNumber: string;
+    cardHolder: string;
+    expiryDate: string;
+    cvv: string;
+}
 
 interface CardPaymentModalProps {
     visible: boolean;
     onClose: () => void;
-    onConfirmPayment: (cardData: CardPaymentData) => void;
+    onConfirmPayment: (cardData: CardPaymentData) => Promise<void>; // ✅ Chỉ async
     totalAmount: number;
     orderNumber: string;
 }
@@ -34,24 +40,22 @@ const CardPaymentModal = ({
 }: CardPaymentModalProps) => {
     const slideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
-    const [isProcessing, setIsProcessing] = useState(false);
-    
-    const [cardData, setCardData] = useState<CardPaymentData>({
+
+    const [form, setForm] = useState<CardPaymentData>({
         cardNumber: '',
         cardHolder: '',
-        expiryMonth: '',
-        expiryYear: '',
+        expiryDate: '',
         cvv: '',
     });
+    const [isProcessing, setIsProcessing] = useState(false);
 
     useEffect(() => {
         if (visible) {
             // Reset form
-            setCardData({
+            setForm({
                 cardNumber: '',
                 cardHolder: '',
-                expiryMonth: '',
-                expiryYear: '',
+                expiryDate: '',
                 cvv: '',
             });
 
@@ -93,91 +97,45 @@ const CardPaymentModal = ({
 
     const formatCardNumber = (text: string) => {
         const cleaned = text.replace(/\s/g, '');
-        const formatted = cleaned.match(/.{1,4}/g)?.join(' ') || cleaned;
-        return formatted.substring(0, 19); // Max 16 digits + 3 spaces
+        const groups = cleaned.match(/.{1,4}/g) || [];
+        return groups.join(' ').substring(0, 19); // Max 16 digits + 3 spaces
     };
 
-    const handleCardNumberChange = (text: string) => {
-        const cleaned = text.replace(/\s/g, '');
-        if (/^\d*$/.test(cleaned) && cleaned.length <= 16) {
-            setCardData(prev => ({ ...prev, cardNumber: cleaned }));
+    const formatExpiryDate = (text: string) => {
+        const cleaned = text.replace(/\//g, '');
+        if (cleaned.length >= 2) {
+            return `${cleaned.substring(0, 2)}/${cleaned.substring(2, 4)}`;
         }
+        return cleaned;
     };
 
-    const handleExpiryMonthChange = (text: string) => {
-        if (/^\d*$/.test(text) && text.length <= 2) {
-            const num = parseInt(text);
-            if (text === '' || (num >= 1 && num <= 12)) {
-                setCardData(prev => ({ ...prev, expiryMonth: text }));
-            }
-        }
-    };
-
-    const handleExpiryYearChange = (text: string) => {
-        if (/^\d*$/.test(text) && text.length <= 2) {
-            setCardData(prev => ({ ...prev, expiryYear: text }));
-        }
-    };
-
-    const handleCVVChange = (text: string) => {
-        if (/^\d*$/.test(text) && text.length <= 3) {
-            setCardData(prev => ({ ...prev, cvv: text }));
-        }
-    };
-
-    const validateCard = (): boolean => {
-        if (cardData.cardNumber.length !== 16) {
-            Alert.alert('Invalid Card', 'Card number must be 16 digits');
-            return false;
+    const handleConfirm = async () => {
+        // Validation
+        const cardNumber = form.cardNumber.replace(/\s/g, '');
+        
+        if (cardNumber.length < 13 || cardNumber.length > 19) {
+            return Alert.alert('Lỗi', 'Số thẻ không hợp lệ');
         }
 
-        if (!cardData.cardHolder.trim()) {
-            Alert.alert('Invalid Card', 'Please enter card holder name');
-            return false;
+        if (!form.cardHolder.trim()) {
+            return Alert.alert('Lỗi', 'Vui lòng nhập tên chủ thẻ');
         }
 
-        const month = parseInt(cardData.expiryMonth);
-        if (cardData.expiryMonth.length !== 2 || month < 1 || month > 12) {
-            Alert.alert('Invalid Expiry', 'Please enter valid expiry month (01-12)');
-            return false;
+        if (!form.expiryDate.match(/^\d{2}\/\d{2}$/)) {
+            return Alert.alert('Lỗi', 'Ngày hết hạn không hợp lệ (MM/YY)');
         }
 
-        if (cardData.expiryYear.length !== 2) {
-            Alert.alert('Invalid Expiry', 'Please enter valid expiry year (YY)');
-            return false;
+        if (form.cvv.length < 3) {
+            return Alert.alert('Lỗi', 'CVV không hợp lệ');
         }
 
-        if (cardData.cvv.length !== 3) {
-            Alert.alert('Invalid CVV', 'CVV must be 3 digits');
-            return false;
-        }
+        setIsProcessing(true);
 
-        return true;
-    };
-
-    const handlePayNow = () => {
-        if (!validateCard()) return;
-
-        Alert.alert(
-            'Xác nhận thanh toán',
-            `Thanh toán ${totalAmount.toLocaleString('vi-VN')}đ bằng thẻ số ${cardData.cardNumber.slice(-4)}?`,
-            [
-                { text: 'Hủy', style: 'cancel' },
-                {
-                    text: 'Thanh toán',
-                    onPress: async () => {
-                        setIsProcessing(true);
-
-                        // Simulate payment processing
-                        setTimeout(() => {
-                            onConfirmPayment(cardData);
-                            setIsProcessing(false);
-                            handleClose();
-                        }, 2000);
-                    },
-                },
-            ]
-        );
+        // Simulate payment processing
+        setTimeout(() => {
+            setIsProcessing(false);
+            onConfirmPayment(form);
+        }, 2000);
     };
 
     if (!visible) return null;
@@ -225,10 +183,10 @@ const CardPaymentModal = ({
                             marginBottom: 20,
                         }}
                     >
-                        <View style={{ flex: 1 }}>
-                            <Text className="h3-bold text-dark-100">Card Payment</Text>
+                        <View>
+                            <Text className="h3-bold text-dark-100">Thanh toán thẻ</Text>
                             <Text className="body-regular text-gray-200 mt-1">
-                                Order: {orderNumber}
+                                Đơn hàng: {orderNumber}
                             </Text>
                         </View>
                         <TouchableOpacity onPress={handleClose}>
@@ -240,7 +198,7 @@ const CardPaymentModal = ({
                         </TouchableOpacity>
                     </View>
 
-                    {/* Amount Display */}
+                    {/* Amount */}
                     <View
                         style={{
                             backgroundColor: '#FFF5E6',
@@ -250,82 +208,77 @@ const CardPaymentModal = ({
                             alignItems: 'center',
                         }}
                     >
-                        <Text className="body-medium text-gray-200 mb-2">Tổng thanh toán</Text>
-                        <Text className="h1-bold text-primary">{totalAmount.toLocaleString('vi-VN')}đ</Text>
+                        <Text className="body-medium text-gray-200 mb-2">Số tiền thanh toán</Text>
+                        <Text className="h1-bold text-primary" style={{ fontSize: 36 }}>
+                            {totalAmount.toLocaleString('vi-VN')}đ
+                        </Text>
                     </View>
 
-                    {/* Card Number */}
-                    <View style={{ marginBottom: 20 }}>
-                        <Text className="label">Card Number</Text>
-                        <TextInput
-                            className="input border-gray-300"
-                            placeholder="1234 5678 9012 3456"
-                            value={formatCardNumber(cardData.cardNumber)}
-                            onChangeText={handleCardNumberChange}
-                            keyboardType="number-pad"
-                            maxLength={19}
-                            placeholderTextColor="#888"
-                        />
-                    </View>
-
-                    {/* Card Holder */}
-                    <View style={{ marginBottom: 20 }}>
-                        <Text className="label">Card Holder Name</Text>
-                        <TextInput
-                            className="input border-gray-300"
-                            placeholder="JOHN DOE"
-                            value={cardData.cardHolder}
-                            onChangeText={(text) =>
-                                setCardData((prev) => ({ ...prev, cardHolder: text.toUpperCase() }))
-                            }
-                            autoCapitalize="characters"
-                            placeholderTextColor="#888"
-                        />
-                    </View>
-
-                    {/* Expiry & CVV */}
-                    <View style={{ flexDirection: 'row', gap: 15, marginBottom: 20 }}>
-                        {/* Expiry Month */}
-                        <View style={{ flex: 1 }}>
-                            <Text className="label">Month</Text>
+                    {/* Card Form */}
+                    <View style={{ gap: 20 }}>
+                        {/* Card Number */}
+                        <View>
+                            <Text className="label">Số thẻ *</Text>
                             <TextInput
                                 className="input border-gray-300"
-                                placeholder="MM"
-                                value={cardData.expiryMonth}
-                                onChangeText={handleExpiryMonthChange}
-                                keyboardType="number-pad"
-                                maxLength={2}
+                                placeholder="1234 5678 9012 3456"
+                                value={form.cardNumber}
+                                onChangeText={(text) => 
+                                    setForm(prev => ({ ...prev, cardNumber: formatCardNumber(text) }))
+                                }
+                                keyboardType="numeric"
+                                maxLength={19}
                                 placeholderTextColor="#888"
                             />
                         </View>
 
-                        {/* Expiry Year */}
-                        <View style={{ flex: 1 }}>
-                            <Text className="label">Year</Text>
+                        {/* Card Holder */}
+                        <View>
+                            <Text className="label">Tên chủ thẻ *</Text>
                             <TextInput
                                 className="input border-gray-300"
-                                placeholder="YY"
-                                value={cardData.expiryYear}
-                                onChangeText={handleExpiryYearChange}
-                                keyboardType="number-pad"
-                                maxLength={2}
+                                placeholder="NGUYEN VAN A"
+                                value={form.cardHolder}
+                                onChangeText={(text) => 
+                                    setForm(prev => ({ ...prev, cardHolder: text.toUpperCase() }))
+                                }
+                                autoCapitalize="characters"
                                 placeholderTextColor="#888"
                             />
                         </View>
 
-                        {/* CVV */}
-                        <View style={{ flex: 1 }}>
-                            <Text className="label">CVV</Text>
-                            <TextInput
-                                className="input border-gray-300"
-                                placeholder="123"
-                                value={cardData.cvv}
-                                onChangeText={handleCVVChange}
-                                keyboardType="number-pad"
-                                maxLength={3}
-                                secureTextEntry
-                                placeholderTextColor="#888"
-                            />
+                        {/* Expiry & CVV */}
+                        <View style={{ flexDirection: 'row', gap: 15 }}>
+                            <View style={{ flex: 1 }}>
+                                <Text className="label">Ngày hết hạn *</Text>
+                                <TextInput
+                                    className="input border-gray-300"
+                                    placeholder="MM/YY"
+                                    value={form.expiryDate}
+                                    onChangeText={(text) => 
+                                        setForm(prev => ({ ...prev, expiryDate: formatExpiryDate(text) }))
+                                    }
+                                    keyboardType="numeric"
+                                    maxLength={5}
+                                    placeholderTextColor="#888"
+                                />
+                            </View>
+
+                            <View style={{ flex: 1 }}>
+                                <Text className="label">CVV *</Text>
+                                <TextInput
+                                    className="input border-gray-300"
+                                    placeholder="123"
+                                    value={form.cvv}
+                                    onChangeText={(text) => 
+                                        setForm(prev => ({ ...prev, cvv: text }))
+                                    }
+                                    keyboardType="numeric"
+                                    maxLength={4}
+                                    secureTextEntry
+                                    placeholderTextColor="#888"
+                                />
+                            </View>
                         </View>
                     </View>
 
@@ -335,104 +288,59 @@ const CardPaymentModal = ({
                             backgroundColor: '#E8F5E9',
                             borderRadius: 15,
                             padding: 15,
-                            marginBottom: 20,
+                            marginTop: 20,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 10,
                         }}
                     >
-                        <Text className="body-medium text-success">
-                            🔒 Your card information is encrypted and secure
+                        <Image
+                            source={images.check}
+                            style={{ width: 20, height: 20 }}
+                            resizeMode="contain"
+                            tintColor="#2F9B65"
+                        />
+                        <Text className="body-regular text-gray-200" style={{ flex: 1 }}>
+                            Thông tin thẻ được mã hóa và bảo mật
                         </Text>
                     </View>
 
-                    {/* Card Preview */}
-                    <View
+                    {/* Confirm Button */}
+                    <TouchableOpacity
+                        onPress={handleConfirm}
+                        disabled={isProcessing}
                         style={{
-                            backgroundColor: '#667eea',
-                            borderRadius: 20,
-                            padding: 20,
-                            marginBottom: 30,
-                            minHeight: 200,
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 4 },
-                            shadowOpacity: 0.3,
-                            shadowRadius: 10,
-                            elevation: 10,
+                            backgroundColor: '#FE8C00',
+                            borderRadius: 25,
+                            paddingVertical: 16,
+                            alignItems: 'center',
+                            marginTop: 30,
                         }}
                     >
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Text className="body-medium text-white">💳 BANK CARD</Text>
-                            <Text className="small-bold text-white">VISA</Text>
-                        </View>
-                        
-                        <View style={{ flex: 1, justifyContent: 'center', marginTop: 25 }}>
-                            <Text 
-                                className="h3-bold text-white" 
-                                style={{ letterSpacing: 3, fontSize: 20 }}
-                            >
-                                {cardData.cardNumber
-                                    ? formatCardNumber(cardData.cardNumber)
-                                    : '•••• •••• •••• ••••'}
+                        {isProcessing ? (
+                            <ActivityIndicator color="white" />
+                        ) : (
+                            <Text className="base-bold text-white">
+                                Xác nhận thanh toán
                             </Text>
-                        </View>
+                        )}
+                    </TouchableOpacity>
 
-                        <View
-                            style={{
-                                flexDirection: 'row',
-                                justifyContent: 'space-between',
-                                marginTop: 25,
-                            }}
-                        >
-                            <View style={{ flex: 1 }}>
-                                <Text className="small-bold text-white opacity-70">CARD HOLDER</Text>
-                                <Text className="paragraph-semibold text-white mt-1" numberOfLines={1}>
-                                    {cardData.cardHolder || 'YOUR NAME'}
-                                </Text>
-                            </View>
-                            <View style={{ alignItems: 'flex-end' }}>
-                                <Text className="small-bold text-white opacity-70">EXPIRES</Text>
-                                <Text className="paragraph-semibold text-white mt-1">
-                                    {cardData.expiryMonth && cardData.expiryYear
-                                        ? `${cardData.expiryMonth}/${cardData.expiryYear}`
-                                        : 'MM/YY'}
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Action Buttons */}
-                    <View style={{ gap: 12 }}>
-                        <TouchableOpacity
-                            onPress={handlePayNow}
-                            disabled={isProcessing}
-                            style={{
-                                backgroundColor: '#2F9B65',
-                                borderRadius: 25,
-                                paddingVertical: 16,
-                                alignItems: 'center',
-                            }}
-                        >
-                            {isProcessing ? (
-                                <ActivityIndicator color="white" />
-                            ) : (
-                                <Text className="base-bold text-white">
-                                    💳 Thanh toán {totalAmount.toLocaleString('vi-VN')}đ
-                                </Text>
-                            )}
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={handleClose}
-                            style={{
-                                backgroundColor: 'transparent',
-                                borderWidth: 1,
-                                borderColor: '#E0E0E0',
-                                borderRadius: 25,
-                                paddingVertical: 16,
-                                alignItems: 'center',
-                            }}
-                        >
-                            <Text className="base-bold text-gray-200">Cancel</Text>
-                        </TouchableOpacity>
-                    </View>
+                    {/* Cancel Button */}
+                    <TouchableOpacity
+                        onPress={handleClose}
+                        style={{
+                            backgroundColor: 'transparent',
+                            borderWidth: 1,
+                            borderColor: '#E0E0E0',
+                            borderRadius: 25,
+                            paddingVertical: 16,
+                            alignItems: 'center',
+                            marginTop: 12,
+                        }}
+                    >
+                        <Text className="base-bold text-gray-200">Hủy</Text>
+                    </TouchableOpacity>
                 </ScrollView>
             </Animated.View>
         </Modal>
