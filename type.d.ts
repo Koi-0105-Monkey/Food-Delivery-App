@@ -120,3 +120,85 @@ interface GetMenuParams {
     category: string;
     query: string;
 }
+
+// type.d.ts - Thêm vào file type.d.ts hiện có
+
+export type PaymentMethod = 'cod' | 'momo' | 'card';
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'cancelled';
+export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'delivering' | 'completed' | 'cancelled';
+
+export interface PaymentInfo {
+    method: PaymentMethod;
+    status: PaymentStatus;
+    transactionId?: string;
+    qrCodeUrl?: string;
+    paidAt?: string;
+}
+
+export interface OrderItem {
+    menu_id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    image_url: string;
+    customizations?: CartCustomization[];
+}
+
+export interface Order extends Models.Document {
+    user: string; // Relationship attribute (userId)
+    order_number: string;
+    items: string; // JSON string of OrderItem[]
+    
+    // Pricing
+    subtotal: number;
+    delivery_fee: number;
+    discount: number;
+    total: number;
+    
+    // Delivery Info
+    delivery_address: string;
+    delivery_phone: string;
+    delivery_notes?: string;
+    
+    // Payment
+    payment_method: PaymentMethod;
+    payment_status: PaymentStatus;
+    transaction_id?: string;
+    qr_code_url?: string;
+    paid_at?: string;
+    
+    // Order Status
+    order_status: OrderStatus;
+    
+    // ✅ Timestamps - Dùng $createdAt và $updatedAt có sẵn của Appwrite
+    // $createdAt: string;
+    // $updatedAt: string;
+}
+
+export interface CardPaymentData {
+    cardNumber: string;
+    cardHolder: string;
+    expiryDate: string;  // ✅ Dùng format MM/YY (đơn giản hơn)
+    cvv: string;
+}
+
+export interface CreateOrderParams {
+    items: OrderItem[];
+    subtotal: number;
+    delivery_fee: number;
+    discount: number;
+    total: number;
+    delivery_address: string;
+    delivery_phone: string;
+    delivery_notes?: string;
+    payment_method: PaymentMethod;
+}
+
+export interface QRCodeData {
+    bank: 'momo' | 'agribank';
+    accountNumber: string;
+    accountName: string;
+    amount: number;
+    description: string;
+    qrUrl: string;
+}
