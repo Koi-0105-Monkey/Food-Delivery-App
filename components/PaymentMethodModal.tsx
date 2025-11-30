@@ -1,6 +1,6 @@
 // components/PaymentMethodModal.tsx
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -12,7 +12,8 @@ import {
     ScrollView,
 } from 'react-native';
 import { images } from '@/constants';
-import { PaymentMethod } from '@/type';
+
+export type PaymentMethod = 'cod' | 'momo' | 'card';
 
 interface PaymentMethodModalProps {
     visible: boolean;
@@ -29,7 +30,6 @@ const PaymentMethodModal = ({
 }: PaymentMethodModalProps) => {
     const slideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
-    const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('cod');
 
     useEffect(() => {
         if (visible) {
@@ -69,31 +69,10 @@ const PaymentMethodModal = ({
         });
     };
 
-    const handleConfirm = () => {
-        onSelectMethod(selectedMethod);
+    const handleSelect = (method: PaymentMethod) => {
+        onSelectMethod(method);
         handleClose();
     };
-
-    const paymentMethods = [
-        {
-            id: 'cod' as PaymentMethod,
-            name: 'Cash on Delivery',
-            description: 'Pay when you receive your order',
-            icon: '💵',
-        },
-        {
-            id: 'momo' as PaymentMethod,
-            name: 'Momo E-Wallet',
-            description: 'Pay via Momo QR Code',
-            icon: '📱',
-        },
-        {
-            id: 'card' as PaymentMethod,
-            name: 'Credit/Debit Card',
-            description: 'Pay with your bank card',
-            icon: '💳',
-        },
-    ];
 
     if (!visible) return null;
 
@@ -115,7 +94,7 @@ const PaymentMethodModal = ({
                     bottom: 0,
                     left: 0,
                     right: 0,
-                    height: Dimensions.get('window').height * 0.7,
+                    height: Dimensions.get('window').height * 0.65,
                     backgroundColor: 'white',
                     borderTopLeftRadius: 30,
                     borderTopRightRadius: 30,
@@ -138,9 +117,9 @@ const PaymentMethodModal = ({
                         }}
                     >
                         <View>
-                            <Text className="h3-bold text-dark-100">Payment Method</Text>
+                            <Text className="h3-bold text-dark-100">Chọn phương thức</Text>
                             <Text className="body-regular text-gray-200 mt-1">
-                                Total: ${totalAmount.toFixed(2)}
+                                Tổng: {totalAmount.toLocaleString('vi-VN')}đ
                             </Text>
                         </View>
                         <TouchableOpacity onPress={handleClose}>
@@ -153,102 +132,136 @@ const PaymentMethodModal = ({
                     </View>
 
                     {/* Payment Methods */}
-                    <View style={{ gap: 15, marginBottom: 30 }}>
-                        {paymentMethods.map((method) => (
-                            <TouchableOpacity
-                                key={method.id}
-                                onPress={() => setSelectedMethod(method.id)}
+                    <View style={{ gap: 15 }}>
+                        {/* Momo */}
+                        <TouchableOpacity
+                            onPress={() => handleSelect('momo')}
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: 'white',
+                                borderWidth: 2,
+                                borderColor: '#A50064',
+                                borderRadius: 20,
+                                padding: 20,
+                            }}
+                        >
+                            <View
                                 style={{
-                                    backgroundColor: selectedMethod === method.id ? '#FFF5E6' : 'white',
-                                    borderWidth: 2,
-                                    borderColor: selectedMethod === method.id ? '#FE8C00' : '#E0E0E0',
-                                    borderRadius: 20,
-                                    padding: 20,
-                                    flexDirection: 'row',
+                                    width: 60,
+                                    height: 60,
+                                    borderRadius: 15,
+                                    backgroundColor: '#A50064',
+                                    justifyContent: 'center',
                                     alignItems: 'center',
+                                    marginRight: 15,
                                 }}
                             >
-                                {/* Icon */}
-                                <View
-                                    style={{
-                                        width: 60,
-                                        height: 60,
-                                        borderRadius: 30,
-                                        backgroundColor: selectedMethod === method.id ? '#FE8C00' : '#F3F4F6',
-                                        justifyContent: 'center',
-                                        alignItems: 'center',
-                                        marginRight: 15,
-                                    }}
-                                >
-                                    <Text style={{ fontSize: 30 }}>{method.icon}</Text>
-                                </View>
+                                <Text style={{ fontSize: 28, color: 'white', fontWeight: 'bold' }}>
+                                    M
+                                </Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text className="base-bold text-dark-100">Ví Momo</Text>
+                                <Text className="body-regular text-gray-200">
+                                    Thanh toán qua ví điện tử Momo
+                                </Text>
+                            </View>
+                            <Image
+                                source={images.arrowRight}
+                                style={{ width: 20, height: 20 }}
+                                resizeMode="contain"
+                            />
+                        </TouchableOpacity>
 
-                                {/* Info */}
-                                <View style={{ flex: 1 }}>
-                                    <Text className="paragraph-bold text-dark-100">
-                                        {method.name}
-                                    </Text>
-                                    <Text className="body-regular text-gray-200 mt-1">
-                                        {method.description}
-                                    </Text>
-                                </View>
+                        {/* Card */}
+                        <TouchableOpacity
+                            onPress={() => handleSelect('card')}
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: 'white',
+                                borderWidth: 2,
+                                borderColor: '#FE8C00',
+                                borderRadius: 20,
+                                padding: 20,
+                            }}
+                        >
+                            <View
+                                style={{
+                                    width: 60,
+                                    height: 60,
+                                    borderRadius: 15,
+                                    backgroundColor: '#FFF5E6',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    marginRight: 15,
+                                }}
+                            >
+                                <Image
+                                    source={images.dollar}
+                                    style={{ width: 30, height: 30 }}
+                                    resizeMode="contain"
+                                    tintColor="#FE8C00"
+                                />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text className="base-bold text-dark-100">Thẻ ATM/Credit</Text>
+                                <Text className="body-regular text-gray-200">
+                                    Thanh toán bằng thẻ ngân hàng
+                                </Text>
+                            </View>
+                            <Image
+                                source={images.arrowRight}
+                                style={{ width: 20, height: 20 }}
+                                resizeMode="contain"
+                            />
+                        </TouchableOpacity>
 
-                                {/* Checkmark */}
-                                {selectedMethod === method.id && (
-                                    <View
-                                        style={{
-                                            width: 24,
-                                            height: 24,
-                                            borderRadius: 12,
-                                            backgroundColor: '#FE8C00',
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                        }}
-                                    >
-                                        <Image
-                                            source={images.check}
-                                            style={{ width: 14, height: 14 }}
-                                            resizeMode="contain"
-                                            tintColor="white"
-                                        />
-                                    </View>
-                                )}
-                            </TouchableOpacity>
-                        ))}
+                        {/* COD */}
+                        <TouchableOpacity
+                            onPress={() => handleSelect('cod')}
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: 'white',
+                                borderWidth: 2,
+                                borderColor: '#2F9B65',
+                                borderRadius: 20,
+                                padding: 20,
+                            }}
+                        >
+                            <View
+                                style={{
+                                    width: 60,
+                                    height: 60,
+                                    borderRadius: 15,
+                                    backgroundColor: '#E8F5E9',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    marginRight: 15,
+                                }}
+                            >
+                                <Image
+                                    source={images.dollar}
+                                    style={{ width: 30, height: 30 }}
+                                    resizeMode="contain"
+                                    tintColor="#2F9B65"
+                                />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text className="base-bold text-dark-100">Tiền mặt (COD)</Text>
+                                <Text className="body-regular text-gray-200">
+                                    Thanh toán khi nhận hàng
+                                </Text>
+                            </View>
+                            <Image
+                                source={images.arrowRight}
+                                style={{ width: 20, height: 20 }}
+                                resizeMode="contain"
+                            />
+                        </TouchableOpacity>
                     </View>
-
-                    {/* Info Box */}
-                    <View
-                        style={{
-                            backgroundColor: '#FFF5E6',
-                            borderRadius: 15,
-                            padding: 15,
-                            marginBottom: 20,
-                        }}
-                    >
-                        <Text className="body-medium text-gray-200">
-                            {selectedMethod === 'cod'
-                                ? '💡 You will pay in cash when receiving your order'
-                                : selectedMethod === 'momo'
-                                ? '💡 A QR code will be generated. Scan to complete payment'
-                                : '💡 Enter your card details to complete payment'}
-                        </Text>
-                    </View>
-
-                    {/* Confirm Button */}
-                    <TouchableOpacity
-                        onPress={handleConfirm}
-                        style={{
-                            backgroundColor: '#FE8C00',
-                            borderRadius: 25,
-                            paddingVertical: 16,
-                            alignItems: 'center',
-                        }}
-                    >
-                        <Text className="base-bold text-white">
-                            Confirm Payment Method
-                        </Text>
-                    </TouchableOpacity>
                 </ScrollView>
             </Animated.View>
         </Modal>

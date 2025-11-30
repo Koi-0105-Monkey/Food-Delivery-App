@@ -1,4 +1,4 @@
-// app/(tabs)/cart.tsx - UPDATED với Card Payment
+// app/(tabs)/cart.tsx - UPDATED VERSION
 
 import { View, Text, FlatList, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,12 +8,12 @@ import CustomHeader from '@/components/CustomHeader';
 import cn from 'clsx';
 import CustomButton from '@/components/CustomButton';
 import CartItem from '@/components/CartItem';
-import { PaymentInfoStripeProps, PaymentMethod, CardPaymentData } from '@/type';
+import { PaymentInfoStripeProps, CardPaymentData } from '@/type';
 import { useState } from 'react';
 import PaymentMethodModal from '@/components/PaymentMethodModal';
-import QRPaymentModal from '@/components/QRPaymentModal';
+import MomoPaymentModal from '@/components/MomoPaymentModal'; // ✅ Momo chính thức
 import CardPaymentModal from '@/components/CardPaymentModal';
-import { createOrder, generatePaymentQR, updatePaymentStatus } from '@/lib/payment';
+import { createOrder, updatePaymentStatus } from '@/lib/payment';
 import useAuthStore from '@/store/auth.store';
 import { router } from 'expo-router';
 
@@ -39,36 +39,35 @@ const Cart = () => {
     const { user } = useAuthStore();
     
     const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [showQRModal, setShowQRModal] = useState(false);
+    const [showMomoModal, setShowMomoModal] = useState(false);
     const [showCardModal, setShowCardModal] = useState(false);
-    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('cod');
-    const [qrData, setQrData] = useState<any>(null);
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'cod' | 'momo' | 'card'>('cod');
     const [currentOrder, setCurrentOrder] = useState<any>(null);
     const [isProcessing, setIsProcessing] = useState(false);
 
     const totalItems = getTotalItems();
     const subtotal = getTotalPrice();
-    const deliveryFee = 15000; // 15,000 VND
-    const discount = 5000; // 5,000 VND
+    const deliveryFee = 15000;
+    const discount = 5000;
     const total = subtotal + deliveryFee - discount;
 
     const handleOrderNow = () => {
         if (totalItems === 0) {
-            return Alert.alert('Empty Cart', 'Please add items to cart first');
+            return Alert.alert('Giỏ hàng trống', 'Vui lòng thêm món vào giỏ hàng');
         }
 
         if (!defaultAddress) {
-            return Alert.alert('No Address', 'Please set your delivery address first');
+            return Alert.alert('Chưa có địa chỉ', 'Vui lòng thiết lập địa chỉ giao hàng');
         }
 
         if (!user?.phone) {
-            return Alert.alert('No Phone', 'Please update your phone number in profile');
+            return Alert.alert('Chưa có số điện thoại', 'Vui lòng cập nhật số điện thoại trong hồ sơ');
         }
 
         setShowPaymentModal(true);
     };
 
-    const handleSelectPaymentMethod = async (method: PaymentMethod) => {
+    const handleSelectPaymentMethod = async (method: 'cod' | 'momo' | 'card') => {
         setSelectedPaymentMethod(method);
         setShowPaymentModal(false);
 
@@ -86,6 +85,7 @@ const Cart = () => {
                 customizations: item.customizations || [],
             }));
 
+            // ✅ Tạo order
             const order = await createOrder(user.$id, {
                 items: orderItems,
                 subtotal,
@@ -100,13 +100,13 @@ const Cart = () => {
             setCurrentOrder(order);
 
             if (method === 'cod') {
-                // COD - Show success
+                // COD - Success
                 Alert.alert(
-                    'Order Placed! 🎉',
-                    `Your order #${order.order_number} has been placed. You will pay ${total.toFixed(2)} when receiving your order.`,
+                    'Đặt hàng thành công! 🎉',
+                    `Đơn hàng #${order.order_number} đã được đặt. Bạn sẽ thanh toán ${total.toLocaleString('vi-VN')}đ khi nhận hàng.`,
                     [
                         {
-                            text: 'View Order',
+                            text: 'Xem đơn hàng',
                             onPress: () => {
                                 clearCart();
                                 router.push('/profile');
@@ -115,49 +115,39 @@ const Cart = () => {
                     ]
                 );
             } else if (method === 'momo') {
-                // Momo - Show QR
-                const qr = generatePaymentQR({
-                    amount: total,
-                    orderNumber: order.order_number,
-                });
-                
-                setQrData(qr);
-                setShowQRModal(true);
+                // ✅ Momo - Mở modal Momo chính thức
+                setShowMomoModal(true);
             } else if (method === 'card') {
-                // Card - Show card form
+                // Card
                 setShowCardModal(true);
             }
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to create order');
+            Alert.alert('Lỗi', error.message || 'Không thể tạo đơn hàng');
         } finally {
             setIsProcessing(false);
         }
     };
 
-    const handleConfirmQRPayment = async () => {
+    const handleMomoPaymentSuccess = async () => {
         if (!currentOrder) return;
 
         try {
-            setIsProcessing(true);
-            await updatePaymentStatus(currentOrder.$id, 'paid', `MOMO${Date.now()}`);
             await clearCart();
 
             Alert.alert(
-                'Payment Successful! 🎉',
-                `Your order #${currentOrder.order_number} has been confirmed!`,
+                'Thanh toán thành công! 🎉',
+                `Đơn hàng #${currentOrder.order_number} đã được xác nhận!`,
                 [
                     {
-                        text: 'View Order',
+                        text: 'Xem đơn hàng',
                         onPress: () => router.push('/profile'),
                     },
                 ]
             );
 
-            setShowQRModal(false);
+            setShowMomoModal(false);
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to confirm payment');
-        } finally {
-            setIsProcessing(false);
+            Alert.alert('Lỗi', error.message || 'Không thể hoàn tất thanh toán');
         }
     };
 
@@ -167,17 +157,16 @@ const Cart = () => {
         try {
             setIsProcessing(true);
 
-            // Simulate card processing
             const transactionId = `CARD${Date.now()}`;
             await updatePaymentStatus(currentOrder.$id, 'paid', transactionId);
             await clearCart();
 
             Alert.alert(
-                'Payment Successful! 🎉',
-                `Charged ${total.toFixed(2)} to card ending in ${cardData.cardNumber.slice(-4)}. Order #${currentOrder.order_number} confirmed!`,
+                'Thanh toán thành công! 🎉',
+                `Đã thanh toán ${total.toLocaleString('vi-VN')}đ bằng thẻ số ${cardData.cardNumber.slice(-4)}. Đơn hàng #${currentOrder.order_number} đã được xác nhận!`,
                 [
                     {
-                        text: 'View Order',
+                        text: 'Xem đơn hàng',
                         onPress: () => router.push('/profile'),
                     },
                 ]
@@ -185,7 +174,7 @@ const Cart = () => {
 
             setShowCardModal(false);
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to process payment');
+            Alert.alert('Lỗi', error.message || 'Không thể xử lý thanh toán');
         } finally {
             setIsProcessing(false);
         }
@@ -196,7 +185,7 @@ const Cart = () => {
             <SafeAreaView className="bg-white h-full flex-center">
                 <ActivityIndicator size="large" color="#FE8C00" />
                 <Text className="paragraph-medium text-gray-200 mt-4">
-                    Processing your order...
+                    Đang xử lý đơn hàng...
                 </Text>
             </SafeAreaView>
         );
@@ -209,12 +198,12 @@ const Cart = () => {
                 renderItem={({ item }) => <CartItem item={item} />}
                 keyExtractor={(item, index) => `${item.id}-${index}`}
                 contentContainerClassName="pb-28 px-5 pt-5"
-                ListHeaderComponent={() => <CustomHeader title="Your Cart" />}
+                ListHeaderComponent={() => <CustomHeader title="Giỏ hàng" />}
                 ListEmptyComponent={() => (
                     <View className="flex-center py-20">
-                        <Text className="h3-bold text-dark-100 mb-2">Cart is Empty</Text>
+                        <Text className="h3-bold text-dark-100 mb-2">Giỏ hàng trống</Text>
                         <Text className="body-regular text-gray-200">
-                            Add some delicious food to get started!
+                            Thêm món ăn ngon để bắt đầu!
                         </Text>
                     </View>
                 )}
@@ -223,33 +212,33 @@ const Cart = () => {
                         <View className="gap-5">
                             <View className="mt-6 border border-gray-200 p-5 rounded-2xl">
                                 <Text className="h3-bold text-dark-100 mb-5">
-                                    Payment Summary
+                                    Tổng thanh toán
                                 </Text>
 
                                 <PaymentInfoStripe
-                                    label={`Total Items (${totalItems})`}
-                                    value={`${subtotal.toFixed(2)}`}
+                                    label={`Tổng món (${totalItems})`}
+                                    value={`${subtotal.toLocaleString('vi-VN')}đ`}
                                 />
                                 <PaymentInfoStripe
-                                    label="Delivery Fee"
-                                    value={`${deliveryFee.toFixed(2)}`}
+                                    label="Phí giao hàng"
+                                    value={`${deliveryFee.toLocaleString('vi-VN')}đ`}
                                 />
                                 <PaymentInfoStripe
-                                    label="Discount"
-                                    value={`- ${discount.toFixed(2)}`}
+                                    label="Giảm giá"
+                                    value={`- ${discount.toLocaleString('vi-VN')}đ`}
                                     valueStyle="!text-success"
                                 />
                                 <View className="border-t border-gray-300 my-2" />
                                 <PaymentInfoStripe
-                                    label="Total"
-                                    value={`${total.toFixed(2)}`}
+                                    label="Tổng cộng"
+                                    value={`${total.toLocaleString('vi-VN')}đ`}
                                     labelStyle="base-bold !text-dark-100"
                                     valueStyle="base-bold !text-dark-100 !text-right"
                                 />
                             </View>
 
                             <CustomButton 
-                                title="Order Now" 
+                                title="Đặt hàng" 
                                 onPress={handleOrderNow}
                             />
                         </View>
@@ -265,14 +254,15 @@ const Cart = () => {
                 totalAmount={total}
             />
 
-            {/* QR Payment Modal */}
-            {qrData && (
-                <QRPaymentModal
-                    visible={showQRModal}
-                    onClose={() => setShowQRModal(false)}
-                    onConfirmPayment={handleConfirmQRPayment}
-                    qrData={qrData}
-                    orderNumber={currentOrder?.order_number || ''}
+            {/* ✅ Momo Payment Modal (OFFICIAL API) */}
+            {currentOrder && (
+                <MomoPaymentModal
+                    visible={showMomoModal}
+                    onClose={() => setShowMomoModal(false)}
+                    onPaymentSuccess={handleMomoPaymentSuccess}
+                    totalAmount={total}
+                    orderNumber={currentOrder.order_number}
+                    orderId={currentOrder.$id}
                 />
             )}
 

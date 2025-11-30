@@ -1,10 +1,21 @@
-// lib/payment.ts - UPDATED VERSION
+// lib/payment.ts - FIXED VERSION
 
 import { ID, Query } from 'react-native-appwrite';
 import { appwriteConfig, databases } from './appwrite';
 import { CreateOrderParams, Order, QRCodeData } from '@/type';
+import CryptoJS from 'crypto-js';
 
 const ORDERS_COLLECTION_ID = process.env.EXPO_PUBLIC_APPWRITE_ORDERS_COLLECTION_ID!;
+
+// ✅ Momo Official API Config
+const MOMO_CONFIG = {
+    partnerCode: 'MOMOEWN820251130',
+    accessKey: 'bxpIpXsB5FM0vn5R',
+    secretKey: '6YIKQUjACi9LBHerKQvTZXcBkEY3NEpq',
+    endpoint: 'https://payment.momo.vn/v2/gateway/api/create',
+    redirectUrl: 'myapp://payment-result',
+    ipnUrl: 'https://momo-backend-test2.vercel.app/api/momo-webhook',
+};
 
 /**
  * Tạo số order duy nhất
@@ -16,34 +27,212 @@ function generateOrderNumber(): string {
 }
 
 /**
- * Generate QR Code cho thanh toán Momo với STK của bạn
+ * ✅ Tạo Momo Payment Request - FIXED
  */
-export function generatePaymentQR(params: {
-    amount: number;
-    orderNumber: string;
-}): QRCodeData {
-    const { amount, orderNumber } = params;
-    
-    // ✅ Thông tin Momo của bạn
-    const momoConfig = {
-        accountNumber: '0896494752', // ✅ STK Momo của bạn
-        accountName: 'HUYNH DUC KHOI', // ✅ Tên của bạn (viết hoa không dấu)
-    };
-    
-    const description = `Payment ${orderNumber}`;
-    
-    // ✅ Generate QR URL với STK của bạn
-    // VietQR hỗ trợ tạo dynamic QR với số tiền
-    const qrUrl = `https://img.vietqr.io/image/MOMO-${momoConfig.accountNumber}-compact.jpg?amount=${amount}&addInfo=${encodeURIComponent(description)}`;
-    
-    return {
-        bank: 'momo',
-        accountNumber: momoConfig.accountNumber,
-        accountName: momoConfig.accountName,
-        amount,
-        description,
-        qrUrl,
-    };
+export async function createMomoPayment(
+    orderNumber: string, 
+    amount: number
+): Promise<{
+    success: boolean;
+    payUrl?: string;
+    deeplink?: string;
+    qrCodeUrl?: string;
+    message?: string;
+}> {
+    try {
+        // ✅ Validate amount - PHẢI là số nguyên
+        const amountInt = Math.round(amount);
+        if (amountInt < 1000) {
+            return {
+                success: false,
+                message: 'Số tiền tối thiểu là 1.000đ',
+            };
+        }
+
+        const requestId = `${orderNumber}_${Date.now()}`;
+        const orderInfo = `Thanh toan don hang ${orderNumber}`;
+        const extraData = '';
+        const requestType = 'captureWallet';
+
+        // ✅ Tạo object params để sort theo alphabet
+        const params: Record<string, string> = {
+            accessKey: MOMO_CONFIG.accessKey,
+            amount: String(amountInt),
+            extraData: extraData,
+            ipnUrl: MOMO_CONFIG.ipnUrl,
+            orderId: orderNumber,
+            orderInfo: orderInfo,
+            partnerCode: MOMO_CONFIG.partnerCode,
+            redirectUrl: MOMO_CONFIG.redirectUrl,
+            requestId: requestId,
+            requestType: requestType,
+        };
+
+        // ✅ Sort keys theo alphabet và tạo raw signature
+        const sortedKeys = Object.keys(params).sort();
+        const rawSignature = sortedKeys
+            .map(key => `${key}=${params[key]}`)
+            .join('&');
+
+        const signature = CryptoJS.HmacSHA256(
+            rawSignature, 
+            MOMO_CONFIG.secretKey
+        ).toString();
+
+        const requestBody = {
+            partnerCode: MOMO_CONFIG.partnerCode,
+            partnerName: 'Food Delivery',
+            storeId: 'FoodStore01',
+            requestId: requestId,
+            amount: amountInt,
+            orderId: orderNumber,
+            orderInfo: orderInfo,
+            redirectUrl: MOMO_CONFIG.redirectUrl,
+            ipnUrl: MOMO_CONFIG.ipnUrl,
+            lang: 'vi',
+            requestType: requestType,
+            autoCapture: true,
+            extraData: extraData,
+            signature: signature,
+        };
+
+        console.log('📤 Sending Momo request:', { 
+            orderNumber, 
+            amount: amountInt,
+            requestId
+        });
+
+        // Debug signature
+        console.log('🔐 Raw signature string:', rawSignature);
+        console.log('🔐 Signature:', signature);
+
+        const response = await fetch(MOMO_CONFIG.endpoint, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+        });
+
+        const responseText = await response.text();
+        console.log('📥 Momo raw response:', responseText);
+
+        if (!response.ok) {
+            console.error('❌ HTTP Error:', response.status, responseText);
+            return {
+                success: false,
+                message: `HTTP Error ${response.status}: ${responseText}`,
+            };
+        }
+
+        let result;
+        try {
+            result = JSON.parse(responseText);
+        } catch (e) {
+            console.error('❌ Parse error:', e);
+            return {
+                success: false,
+                message: 'Không thể parse response từ Momo',
+            };
+        }
+
+        console.log('📥 Momo parsed response:', result);
+
+        if (result.resultCode === 0) {
+            console.log('✅ Momo payment created successfully');
+            return {
+                success: true,
+                payUrl: result.payUrl,
+                deeplink: result.deeplink,
+                qrCodeUrl: result.qrCodeUrl,
+            };
+        } else {
+            // Xử lý lỗi cụ thể
+            const errorMessages: { [key: number]: string } = {
+                10: 'Hệ thống bảo trì',
+                11: 'Truy cập bị từ chối',
+                12: 'Phiên bản API không được hỗ trợ',
+                13: 'Xác thực chủ merchant thất bại',
+                20: 'Số tiền không hợp lệ',
+                21: 'Số tiền giao dịch vượt hạn mức',
+                40: 'RequestId bị trùng',
+                41: 'OrderId bị trùng',
+                42: 'OrderId không hợp lệ hoặc không được tìm thấy',
+                43: 'Request bị trùng (accessKey/requestId)',
+                1000: 'Giao dịch bị từ chối bởi người dùng',
+                1001: 'Tài khoản không đủ tiền',
+                1002: 'Giao dịch bị từ chối do nhà phát hành',
+                1003: 'Đã hủy giao dịch',
+                1004: 'Số tiền thanh toán vượt quá hạn mức',
+                1005: 'URL hoặc QR code đã hết hạn',
+                1006: 'Người dùng từ chối xác nhận',
+                9000: 'Giao dịch đang được xử lý',
+            };
+
+            const errorMessage = errorMessages[result.resultCode] || result.message || 'Thanh toán thất bại';
+            
+            console.error('❌ Momo error:', {
+                code: result.resultCode,
+                message: errorMessage
+            });
+
+            return {
+                success: false,
+                message: errorMessage,
+            };
+        }
+    } catch (error: any) {
+        console.error('❌ Momo payment error:', error);
+        return {
+            success: false,
+            message: error.message || 'Không thể kết nối với Momo',
+        };
+    }
+}
+
+/**
+ * ✅ Polling check payment status
+ */
+export async function pollPaymentStatus(
+    orderId: string, 
+    maxAttempts = 60,
+    intervalMs = 3000
+): Promise<boolean> {
+    let attempts = 0;
+
+    return new Promise((resolve) => {
+        const interval = setInterval(async () => {
+            attempts++;
+
+            try {
+                const order = await getOrderById(orderId);
+                
+                if (order) {
+                    if (order.payment_status === 'paid') {
+                        console.log('✅ Payment confirmed!');
+                        clearInterval(interval);
+                        resolve(true);
+                    } else if (order.payment_status === 'failed') {
+                        console.log('❌ Payment failed');
+                        clearInterval(interval);
+                        resolve(false);
+                    }
+                }
+                
+                if (attempts >= maxAttempts) {
+                    console.log('⏱️ Polling timeout');
+                    clearInterval(interval);
+                    resolve(false);
+                }
+            } catch (error) {
+                console.error('Polling error:', error);
+                if (attempts >= maxAttempts) {
+                    clearInterval(interval);
+                    resolve(false);
+                }
+            }
+        }, intervalMs);
+    });
 }
 
 /**
@@ -53,18 +242,6 @@ export async function createOrder(userId: string, params: CreateOrderParams): Pr
     try {
         const orderNumber = generateOrderNumber();
         
-        let qrCodeUrl: string | undefined;
-        
-        // Nếu thanh toán Momo, tạo QR code
-        if (params.payment_method === 'momo') {
-            const qrData = generatePaymentQR({
-                amount: params.total,
-                orderNumber,
-            });
-            qrCodeUrl = qrData.qrUrl;
-        }
-        
-        // ✅ BỎ created_at và updated_at - Dùng $createdAt và $updatedAt có sẵn
         const orderDoc = await databases.createDocument(
             appwriteConfig.databaseId,
             ORDERS_COLLECTION_ID,
@@ -85,7 +262,7 @@ export async function createOrder(userId: string, params: CreateOrderParams): Pr
                 
                 payment_method: params.payment_method,
                 payment_status: 'pending',
-                qr_code_url: qrCodeUrl || '',
+                qr_code_url: '',
                 
                 order_status: 'pending',
             }
@@ -95,7 +272,7 @@ export async function createOrder(userId: string, params: CreateOrderParams): Pr
         return orderDoc as Order;
     } catch (error: any) {
         console.error('❌ Create order error:', error);
-        throw new Error(error.message || 'Failed to create order');
+        throw new Error(error.message || 'Không thể tạo đơn hàng');
     }
 }
 
@@ -109,7 +286,7 @@ export async function getUserOrders(userId: string): Promise<Order[]> {
             ORDERS_COLLECTION_ID,
             [
                 Query.equal('user', userId),
-                Query.orderDesc('$createdAt'), // ✅ Dùng $createdAt có sẵn
+                Query.orderDesc('$createdAt'),
                 Query.limit(100),
             ]
         );
@@ -148,7 +325,6 @@ export async function updatePaymentStatus(
     transactionId?: string
 ): Promise<void> {
     try {
-        // ✅ BỎ updated_at - Appwrite tự động update $updatedAt
         await databases.updateDocument(
             appwriteConfig.databaseId,
             ORDERS_COLLECTION_ID,
@@ -164,7 +340,7 @@ export async function updatePaymentStatus(
         console.log('✅ Payment status updated:', status);
     } catch (error: any) {
         console.error('❌ Update payment error:', error);
-        throw new Error(error.message || 'Failed to update payment');
+        throw new Error(error.message || 'Không thể cập nhật thanh toán');
     }
 }
 
@@ -176,7 +352,6 @@ export async function updateOrderStatus(
     status: 'pending' | 'confirmed' | 'preparing' | 'delivering' | 'completed' | 'cancelled'
 ): Promise<void> {
     try {
-        // ✅ BỎ updated_at
         await databases.updateDocument(
             appwriteConfig.databaseId,
             ORDERS_COLLECTION_ID,
@@ -189,7 +364,7 @@ export async function updateOrderStatus(
         console.log('✅ Order status updated:', status);
     } catch (error: any) {
         console.error('❌ Update order status error:', error);
-        throw new Error(error.message || 'Failed to update order status');
+        throw new Error(error.message || 'Không thể cập nhật trạng thái');
     }
 }
 
@@ -211,7 +386,7 @@ export async function cancelOrder(orderId: string): Promise<void> {
         console.log('✅ Order cancelled');
     } catch (error: any) {
         console.error('❌ Cancel order error:', error);
-        throw new Error(error.message || 'Failed to cancel order');
+        throw new Error(error.message || 'Không thể hủy đơn hàng');
     }
 }
 
@@ -229,7 +404,7 @@ export async function getOrdersByStatus(
             [
                 Query.equal('user', userId),
                 Query.equal('order_status', status),
-                Query.orderDesc('$createdAt'), // ✅ Dùng $createdAt
+                Query.orderDesc('$createdAt'),
             ]
         );
         
@@ -238,4 +413,31 @@ export async function getOrdersByStatus(
         console.error('❌ Get orders by status error:', error);
         return [];
     }
+}
+
+/**
+ * @deprecated Legacy function
+ */
+export function generatePaymentQR(params: {
+    amount: number;
+    orderNumber: string;
+}): QRCodeData {
+    const { amount, orderNumber } = params;
+    
+    const momoConfig = {
+        accountNumber: '0896494752',
+        accountName: 'HUYNH DUC KHOI',
+    };
+    
+    const description = `Payment ${orderNumber}`;
+    const qrUrl = `https://img.vietqr.io/image/MOMO-${momoConfig.accountNumber}-compact.jpg?amount=${amount}&addInfo=${encodeURIComponent(description)}`;
+    
+    return {
+        bank: 'momo',
+        accountNumber: momoConfig.accountNumber,
+        accountName: momoConfig.accountName,
+        amount,
+        description,
+        qrUrl,
+    };
 }
