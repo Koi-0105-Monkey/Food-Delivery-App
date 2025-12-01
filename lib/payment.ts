@@ -1,24 +1,24 @@
-// lib/payment.ts - FIXED VERSION
+// lib/payment.ts - COMPLETE FIXED VERSION
 
 import { ID, Query } from 'react-native-appwrite';
 import { appwriteConfig, databases } from './appwrite';
-import { CreateOrderParams, Order, QRCodeData } from '@/type';
+import { CreateOrderParams, Order } from '@/type';
 import CryptoJS from 'crypto-js';
 
 const ORDERS_COLLECTION_ID = process.env.EXPO_PUBLIC_APPWRITE_ORDERS_COLLECTION_ID!;
 
-// ✅ Momo Official API Config
+// ✅ MOMO CONFIG - PRODUCTION
 const MOMO_CONFIG = {
     partnerCode: 'MOMOEWN820251130',
     accessKey: 'bxpIpXsB5FM0vn5R',
     secretKey: '6YIKQUjACi9LBHerKQvTZXcBkEY3NEpq',
-    endpoint: 'https://payment.momo.vn/v2/gateway/api/create',
+    endpoint: 'https://payment.momo.vn/v2/gateway/api/create', // ⚠️ TEST environment
     redirectUrl: 'myapp://payment-result',
-    ipnUrl: 'https://momo-backend-test2.vercel.app/api/momo-webhook',
+    ipnUrl: 'https://momo-backend-1.vercel.app/api/momo-webhook',
 };
 
 /**
- * Tạo số order duy nhất
+ * Generate unique order number
  */
 function generateOrderNumber(): string {
     const timestamp = Date.now();
@@ -27,7 +27,7 @@ function generateOrderNumber(): string {
 }
 
 /**
- * ✅ Tạo Momo Payment Request - FIXED
+ * ✅ FIXED: Create Momo Payment với captureWallet (không bị bug dấu chấm)
  */
 export async function createMomoPayment(
     orderNumber: string, 
@@ -40,39 +40,31 @@ export async function createMomoPayment(
     message?: string;
 }> {
     try {
-        // ✅ Validate amount - PHẢI là số nguyên
         const amountInt = Math.round(amount);
         if (amountInt < 1000) {
             return {
                 success: false,
-                message: 'Số tiền tối thiểu là 1.000đ',
+                message: 'Minimum amount is 1,000đ',
             };
         }
 
         const requestId = `${orderNumber}_${Date.now()}`;
-        const orderInfo = `Thanh toan don hang ${orderNumber}`;
+        const orderInfo = `Payment ${orderNumber}`;
         const extraData = '';
-        const requestType = 'captureWallet';
+        const requestType = 'captureWallet'; // ✅ BACK TO captureWallet - Stable
 
-        // ✅ Tạo object params để sort theo alphabet
-        const params: Record<string, string> = {
-            accessKey: MOMO_CONFIG.accessKey,
-            amount: String(amountInt),
-            extraData: extraData,
-            ipnUrl: MOMO_CONFIG.ipnUrl,
-            orderId: orderNumber,
-            orderInfo: orderInfo,
-            partnerCode: MOMO_CONFIG.partnerCode,
-            redirectUrl: MOMO_CONFIG.redirectUrl,
-            requestId: requestId,
-            requestType: requestType,
-        };
-
-        // ✅ Sort keys theo alphabet và tạo raw signature
-        const sortedKeys = Object.keys(params).sort();
-        const rawSignature = sortedKeys
-            .map(key => `${key}=${params[key]}`)
-            .join('&');
+        // ✅ Build raw signature string - EXACT alphabet order
+        const rawSignature = 
+            `accessKey=${MOMO_CONFIG.accessKey}` +
+            `&amount=${amountInt}` +
+            `&extraData=${extraData}` +
+            `&ipnUrl=${MOMO_CONFIG.ipnUrl}` +
+            `&orderId=${orderNumber}` +
+            `&orderInfo=${orderInfo}` +
+            `&partnerCode=${MOMO_CONFIG.partnerCode}` +
+            `&redirectUrl=${MOMO_CONFIG.redirectUrl}` +
+            `&requestId=${requestId}` +
+            `&requestType=${requestType}`;
 
         const signature = CryptoJS.HmacSHA256(
             rawSignature, 
@@ -89,21 +81,14 @@ export async function createMomoPayment(
             orderInfo: orderInfo,
             redirectUrl: MOMO_CONFIG.redirectUrl,
             ipnUrl: MOMO_CONFIG.ipnUrl,
-            lang: 'vi',
+            lang: 'en',
             requestType: requestType,
             autoCapture: true,
             extraData: extraData,
             signature: signature,
         };
 
-        console.log('📤 Sending Momo request:', { 
-            orderNumber, 
-            amount: amountInt,
-            requestId
-        });
-
-        // Debug signature
-        console.log('🔐 Raw signature string:', rawSignature);
+        console.log('📤 Momo Request:', { orderNumber, amount: amountInt });
         console.log('🔐 Signature:', signature);
 
         const response = await fetch(MOMO_CONFIG.endpoint, {
@@ -115,13 +100,12 @@ export async function createMomoPayment(
         });
 
         const responseText = await response.text();
-        console.log('📥 Momo raw response:', responseText);
+        console.log('📥 Momo Response:', responseText);
 
         if (!response.ok) {
-            console.error('❌ HTTP Error:', response.status, responseText);
             return {
                 success: false,
-                message: `HTTP Error ${response.status}: ${responseText}`,
+                message: `HTTP Error ${response.status}`,
             };
         }
 
@@ -129,17 +113,14 @@ export async function createMomoPayment(
         try {
             result = JSON.parse(responseText);
         } catch (e) {
-            console.error('❌ Parse error:', e);
             return {
                 success: false,
-                message: 'Không thể parse response từ Momo',
+                message: 'Unable to parse response',
             };
         }
 
-        console.log('📥 Momo parsed response:', result);
-
         if (result.resultCode === 0) {
-            console.log('✅ Momo payment created successfully');
+            console.log('✅ Payment created successfully');
             return {
                 success: true,
                 payUrl: result.payUrl,
@@ -147,34 +128,22 @@ export async function createMomoPayment(
                 qrCodeUrl: result.qrCodeUrl,
             };
         } else {
-            // Xử lý lỗi cụ thể
             const errorMessages: { [key: number]: string } = {
-                10: 'Hệ thống bảo trì',
-                11: 'Truy cập bị từ chối',
-                12: 'Phiên bản API không được hỗ trợ',
-                13: 'Xác thực chủ merchant thất bại',
-                20: 'Số tiền không hợp lệ',
-                21: 'Số tiền giao dịch vượt hạn mức',
-                40: 'RequestId bị trùng',
-                41: 'OrderId bị trùng',
-                42: 'OrderId không hợp lệ hoặc không được tìm thấy',
-                43: 'Request bị trùng (accessKey/requestId)',
-                1000: 'Giao dịch bị từ chối bởi người dùng',
-                1001: 'Tài khoản không đủ tiền',
-                1002: 'Giao dịch bị từ chối do nhà phát hành',
-                1003: 'Đã hủy giao dịch',
-                1004: 'Số tiền thanh toán vượt quá hạn mức',
-                1005: 'URL hoặc QR code đã hết hạn',
-                1006: 'Người dùng từ chối xác nhận',
-                9000: 'Giao dịch đang được xử lý',
+                10: 'System maintenance',
+                11: 'Access denied',
+                13: 'Merchant authentication failed',
+                20: 'Invalid amount',
+                40: 'Duplicate requestId',
+                41: 'Duplicate orderId',
+                1000: 'User declined payment',
+                1001: 'Insufficient balance',
+                9000: 'Transaction processing',
+                11007: 'Invalid signature - Check your API keys',
             };
 
-            const errorMessage = errorMessages[result.resultCode] || result.message || 'Thanh toán thất bại';
+            const errorMessage = errorMessages[result.resultCode] || result.message || 'Payment failed';
             
-            console.error('❌ Momo error:', {
-                code: result.resultCode,
-                message: errorMessage
-            });
+            console.error('❌ Momo Error:', result.resultCode, errorMessage);
 
             return {
                 success: false,
@@ -182,16 +151,16 @@ export async function createMomoPayment(
             };
         }
     } catch (error: any) {
-        console.error('❌ Momo payment error:', error);
+        console.error('❌ Payment error:', error);
         return {
             success: false,
-            message: error.message || 'Không thể kết nối với Momo',
+            message: error.message || 'Unable to connect to Momo',
         };
     }
 }
 
 /**
- * ✅ Polling check payment status
+ * Polling payment status
  */
 export async function pollPaymentStatus(
     orderId: string, 
@@ -209,23 +178,19 @@ export async function pollPaymentStatus(
                 
                 if (order) {
                     if (order.payment_status === 'paid') {
-                        console.log('✅ Payment confirmed!');
                         clearInterval(interval);
                         resolve(true);
                     } else if (order.payment_status === 'failed') {
-                        console.log('❌ Payment failed');
                         clearInterval(interval);
                         resolve(false);
                     }
                 }
                 
                 if (attempts >= maxAttempts) {
-                    console.log('⏱️ Polling timeout');
                     clearInterval(interval);
                     resolve(false);
                 }
             } catch (error) {
-                console.error('Polling error:', error);
                 if (attempts >= maxAttempts) {
                     clearInterval(interval);
                     resolve(false);
@@ -235,9 +200,6 @@ export async function pollPaymentStatus(
     });
 }
 
-/**
- * Tạo đơn hàng mới
- */
 export async function createOrder(userId: string, params: CreateOrderParams): Promise<Order> {
     try {
         const orderNumber = generateOrderNumber();
@@ -250,20 +212,16 @@ export async function createOrder(userId: string, params: CreateOrderParams): Pr
                 user: userId,
                 order_number: orderNumber,
                 items: JSON.stringify(params.items),
-                
                 subtotal: params.subtotal,
                 delivery_fee: params.delivery_fee,
                 discount: params.discount,
                 total: params.total,
-                
                 delivery_address: params.delivery_address,
                 delivery_phone: params.delivery_phone,
                 delivery_notes: params.delivery_notes || '',
-                
                 payment_method: params.payment_method,
                 payment_status: 'pending',
                 qr_code_url: '',
-                
                 order_status: 'pending',
             }
         );
@@ -272,13 +230,10 @@ export async function createOrder(userId: string, params: CreateOrderParams): Pr
         return orderDoc as Order;
     } catch (error: any) {
         console.error('❌ Create order error:', error);
-        throw new Error(error.message || 'Không thể tạo đơn hàng');
+        throw new Error(error.message || 'Unable to create order');
     }
 }
 
-/**
- * Lấy danh sách đơn hàng của user
- */
 export async function getUserOrders(userId: string): Promise<Order[]> {
     try {
         const orders = await databases.listDocuments(
@@ -298,9 +253,6 @@ export async function getUserOrders(userId: string): Promise<Order[]> {
     }
 }
 
-/**
- * Lấy chi tiết đơn hàng
- */
 export async function getOrderById(orderId: string): Promise<Order | null> {
     try {
         const order = await databases.getDocument(
@@ -316,9 +268,6 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
     }
 }
 
-/**
- * Cập nhật trạng thái thanh toán
- */
 export async function updatePaymentStatus(
     orderId: string,
     status: 'paid' | 'failed',
@@ -340,13 +289,10 @@ export async function updatePaymentStatus(
         console.log('✅ Payment status updated:', status);
     } catch (error: any) {
         console.error('❌ Update payment error:', error);
-        throw new Error(error.message || 'Không thể cập nhật thanh toán');
+        throw new Error(error.message || 'Unable to update payment');
     }
 }
 
-/**
- * Cập nhật trạng thái đơn hàng
- */
 export async function updateOrderStatus(
     orderId: string,
     status: 'pending' | 'confirmed' | 'preparing' | 'delivering' | 'completed' | 'cancelled'
@@ -356,21 +302,16 @@ export async function updateOrderStatus(
             appwriteConfig.databaseId,
             ORDERS_COLLECTION_ID,
             orderId,
-            {
-                order_status: status,
-            }
+            { order_status: status }
         );
         
         console.log('✅ Order status updated:', status);
     } catch (error: any) {
         console.error('❌ Update order status error:', error);
-        throw new Error(error.message || 'Không thể cập nhật trạng thái');
+        throw new Error(error.message || 'Unable to update status');
     }
 }
 
-/**
- * Hủy đơn hàng
- */
 export async function cancelOrder(orderId: string): Promise<void> {
     try {
         await databases.updateDocument(
@@ -386,13 +327,10 @@ export async function cancelOrder(orderId: string): Promise<void> {
         console.log('✅ Order cancelled');
     } catch (error: any) {
         console.error('❌ Cancel order error:', error);
-        throw new Error(error.message || 'Không thể hủy đơn hàng');
+        throw new Error(error.message || 'Unable to cancel order');
     }
 }
 
-/**
- * Lấy orders theo status
- */
 export async function getOrdersByStatus(
     userId: string,
     status: string
@@ -413,31 +351,4 @@ export async function getOrdersByStatus(
         console.error('❌ Get orders by status error:', error);
         return [];
     }
-}
-
-/**
- * @deprecated Legacy function
- */
-export function generatePaymentQR(params: {
-    amount: number;
-    orderNumber: string;
-}): QRCodeData {
-    const { amount, orderNumber } = params;
-    
-    const momoConfig = {
-        accountNumber: '0896494752',
-        accountName: 'HUYNH DUC KHOI',
-    };
-    
-    const description = `Payment ${orderNumber}`;
-    const qrUrl = `https://img.vietqr.io/image/MOMO-${momoConfig.accountNumber}-compact.jpg?amount=${amount}&addInfo=${encodeURIComponent(description)}`;
-    
-    return {
-        bank: 'momo',
-        accountNumber: momoConfig.accountNumber,
-        accountName: momoConfig.accountName,
-        amount,
-        description,
-        qrUrl,
-    };
 }
