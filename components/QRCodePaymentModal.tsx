@@ -1,4 +1,4 @@
-// components/MomoPaymentModal.tsx - Proper Momo Payment Integration
+// components/QRCodePaymentModal.tsx - NEW COMPONENT
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -12,22 +12,11 @@ import {
     ScrollView,
     Alert,
     ActivityIndicator,
-    Linking,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
 import { images } from '@/constants';
 import { createMomoPayment, pollPaymentStatus } from '@/lib/payment';
 
-// ✅ Interface cho Momo Payment Response
-interface MomoPaymentResult {
-    success: boolean;
-    payUrl?: string;
-    deeplink?: string;
-    qrCodeUrl?: string;
-    message?: string;
-}
-
-interface MomoPaymentModalProps {
+interface QRCodePaymentModalProps {
     visible: boolean;
     onClose: () => void;
     onPaymentSuccess: () => void;
@@ -36,28 +25,24 @@ interface MomoPaymentModalProps {
     orderId: string;
 }
 
-const MomoPaymentModal = ({ 
+const QRCodePaymentModal = ({ 
     visible, 
     onClose, 
     onPaymentSuccess,
     totalAmount,
     orderNumber,
     orderId,
-}: MomoPaymentModalProps) => {
+}: QRCodePaymentModalProps) => {
     const slideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
     
     const [isLoading, setIsLoading] = useState(false);
-    const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
-    const [showWebView, setShowWebView] = useState(false);
+    const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
 
     useEffect(() => {
         if (visible) {
-            // Reset state
-            setPaymentUrl(null);
-            setShowWebView(false);
+            setQrCodeUrl(null);
             
-            // Animate in
             Animated.parallel([
                 Animated.spring(slideAnim, {
                     toValue: 0,
@@ -72,52 +57,29 @@ const MomoPaymentModal = ({
                 }),
             ]).start();
 
-            // Tạo Momo payment request
-            initMomoPayment();
+            // Generate QR Code
+            initQRPayment();
         } else {
             slideAnim.setValue(Dimensions.get('window').height);
             opacityAnim.setValue(0);
         }
     }, [visible]);
 
-    const initMomoPayment = async () => {
+    const initQRPayment = async () => {
         try {
             setIsLoading(true);
 
-            // ✅ Gọi Momo API
-            const result = await createMomoPayment(
-                orderNumber,
-                totalAmount
-            );
+            const result = await createMomoPayment(orderNumber, totalAmount);
 
-            if (result.success) {
-                // ✅ Type-safe access với optional chaining
-                if (result.payUrl) {
-                    setPaymentUrl(result.payUrl);
-                }
-                
-                // Option 1: Mở Momo app (nếu có deeplink)
-                if (result.deeplink) {
-                    const supported = await Linking.canOpenURL(result.deeplink);
-                    if (supported) {
-                        await Linking.openURL(result.deeplink);
-                        // Bắt đầu polling
-                        startPolling();
-                    } else {
-                        // Fallback: Show WebView
-                        setShowWebView(true);
-                    }
-                } else if (result.payUrl) {
-                    // Show WebView payment nếu không có deeplink
-                    setShowWebView(true);
-                } else {
-                    throw new Error('Không nhận được payment URL từ Momo');
-                }
+            if (result.success && result.qrCodeUrl) {
+                setQrCodeUrl(result.qrCodeUrl);
+                // Start polling
+                startPolling();
             } else {
-                throw new Error(result.message || 'Momo payment failed');
+                throw new Error(result.message || 'Unable to generate QR code');
             }
         } catch (error: any) {
-            Alert.alert('Lỗi', error.message || 'Không thể tạo thanh toán Momo');
+            Alert.alert('Error', error.message || 'Unable to create payment');
             onClose();
         } finally {
             setIsLoading(false);
@@ -126,20 +88,19 @@ const MomoPaymentModal = ({
 
     const startPolling = async () => {
         try {
-            // Polling mỗi 3 giây trong 3 phút (60 lần)
             const success = await pollPaymentStatus(orderId, 60);
 
             if (success) {
                 Alert.alert(
-                    'Thanh toán thành công! 🎉',
-                    'Đơn hàng của bạn đã được xác nhận!'
+                    'Payment Successful! 🎉',
+                    'Your order has been confirmed!'
                 );
                 onPaymentSuccess();
                 handleClose();
             } else {
                 Alert.alert(
                     'Timeout',
-                    'Không nhận được xác nhận thanh toán. Vui lòng kiểm tra lại.'
+                    'Payment confirmation not received. Please check again.'
                 );
             }
         } catch (error) {
@@ -164,14 +125,6 @@ const MomoPaymentModal = ({
         });
     };
 
-    const handleWebViewNavigationStateChange = (navState: any) => {
-        // Check if redirected to success page
-        if (navState.url.includes('payment-result')) {
-            setShowWebView(false);
-            startPolling();
-        }
-    };
-
     if (!visible) return null;
 
     return (
@@ -192,7 +145,7 @@ const MomoPaymentModal = ({
                     bottom: 0,
                     left: 0,
                     right: 0,
-                    height: Dimensions.get('window').height * 0.9,
+                    height: Dimensions.get('window').height * 0.85,
                     backgroundColor: 'white',
                     borderTopLeftRadius: 30,
                     borderTopRightRadius: 30,
@@ -216,9 +169,9 @@ const MomoPaymentModal = ({
                     }}
                 >
                     <View style={{ flex: 1 }}>
-                        <Text className="h3-bold text-dark-100">Thanh toán Momo</Text>
+                        <Text className="h3-bold text-dark-100">QR Code Payment</Text>
                         <Text className="body-regular text-gray-200 mt-1">
-                            Đơn hàng: {orderNumber}
+                            Order: {orderNumber}
                         </Text>
                     </View>
                     <TouchableOpacity onPress={handleClose}>
@@ -235,15 +188,9 @@ const MomoPaymentModal = ({
                     <View className="flex-1 flex-center">
                         <ActivityIndicator size="large" color="#FE8C00" />
                         <Text className="paragraph-medium text-gray-200 mt-4">
-                            Đang kết nối với Momo...
+                            Generating QR code...
                         </Text>
                     </View>
-                ) : showWebView && paymentUrl ? (
-                    <WebView
-                        source={{ uri: paymentUrl }}
-                        style={{ flex: 1 }}
-                        onNavigationStateChange={handleWebViewNavigationStateChange}
-                    />
                 ) : (
                     <ScrollView contentContainerStyle={{ padding: 30 }}>
                         {/* Amount Display */}
@@ -256,11 +203,35 @@ const MomoPaymentModal = ({
                                 alignItems: 'center',
                             }}
                         >
-                            <Text className="body-medium text-gray-200 mb-2">Số tiền thanh toán</Text>
+                            <Text className="body-medium text-gray-200 mb-2">Amount to Pay</Text>
                             <Text className="h1-bold text-primary" style={{ fontSize: 36 }}>
                                 {totalAmount.toLocaleString('vi-VN')}đ
                             </Text>
                         </View>
+
+                        {/* QR Code */}
+                        {qrCodeUrl ? (
+                            <View
+                                style={{
+                                    backgroundColor: 'white',
+                                    borderRadius: 20,
+                                    padding: 20,
+                                    alignItems: 'center',
+                                    borderWidth: 2,
+                                    borderColor: '#E0E0E0',
+                                    marginBottom: 20,
+                                }}
+                            >
+                                <Image
+                                    source={{ uri: qrCodeUrl }}
+                                    style={{ width: 280, height: 280 }}
+                                    resizeMode="contain"
+                                />
+                                <Text className="paragraph-semibold text-dark-100 mt-4 text-center">
+                                    Scan this QR code with your banking app
+                                </Text>
+                            </View>
+                        ) : null}
 
                         {/* Instructions */}
                         <View
@@ -271,12 +242,14 @@ const MomoPaymentModal = ({
                             }}
                         >
                             <Text className="paragraph-bold text-dark-100 mb-3">
-                                ✅ Đã mở app Momo
+                                ✅ How to pay:
                             </Text>
                             <Text className="body-regular text-gray-200">
-                                • Xác nhận thanh toán trong app Momo{'\n'}
-                                • Đợi xác nhận (tự động){'\n'}
-                                • Không đóng màn hình này
+                                1. Open your banking app{'\n'}
+                                2. Scan the QR code above{'\n'}
+                                3. Confirm the payment{'\n'}
+                                4. Wait for confirmation (automatic){'\n'}
+                                5. Do not close this screen
                             </Text>
                         </View>
 
@@ -284,7 +257,7 @@ const MomoPaymentModal = ({
                         <View className="flex-center mt-10">
                             <ActivityIndicator size="large" color="#2F9B65" />
                             <Text className="paragraph-medium text-gray-200 mt-4">
-                                Đang chờ xác nhận thanh toán...
+                                Waiting for payment confirmation...
                             </Text>
                         </View>
                     </ScrollView>
@@ -294,4 +267,4 @@ const MomoPaymentModal = ({
     );
 };
 
-export default MomoPaymentModal;
+export default QRCodePaymentModal;

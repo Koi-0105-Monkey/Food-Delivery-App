@@ -1,4 +1,4 @@
-// components/PaymentMethodModal.tsx
+// components/PaymentMethodModal.tsx - FIXED VERSION
 
 import React, { useEffect, useRef } from 'react';
 import {
@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { images } from '@/constants';
 
-export type PaymentMethod = 'cod' | 'momo' | 'card';
+export type PaymentMethod = 'cod' | 'qr' | 'card';
 
 interface PaymentMethodModalProps {
     visible: boolean;
@@ -70,15 +70,22 @@ const PaymentMethodModal = ({
     };
 
     const handleSelect = (method: PaymentMethod) => {
-        onSelectMethod(method);
         handleClose();
+        // Delay để animation hoàn thành trước khi trigger tiếp
+        setTimeout(() => {
+            onSelectMethod(method);
+        }, 300);
     };
 
     if (!visible) return null;
 
     return (
         <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={handleClose}>
+            <TouchableOpacity 
+                style={{ flex: 1 }} 
+                activeOpacity={1} 
+                onPress={handleClose}
+            >
                 <Animated.View
                     style={{
                         flex: 1,
@@ -117,9 +124,9 @@ const PaymentMethodModal = ({
                         }}
                     >
                         <View>
-                            <Text className="h3-bold text-dark-100">Chọn phương thức</Text>
+                            <Text className="h3-bold text-dark-100">Payment Method</Text>
                             <Text className="body-regular text-gray-200 mt-1">
-                                Tổng: {totalAmount.toLocaleString('vi-VN')}đ
+                                Total: {totalAmount.toLocaleString('vi-VN')}đ
                             </Text>
                         </View>
                         <TouchableOpacity onPress={handleClose}>
@@ -133,15 +140,15 @@ const PaymentMethodModal = ({
 
                     {/* Payment Methods */}
                     <View style={{ gap: 15 }}>
-                        {/* Momo */}
+                        {/* QR Code Payment */}
                         <TouchableOpacity
-                            onPress={() => handleSelect('momo')}
+                            onPress={() => handleSelect('qr')}
                             style={{
                                 flexDirection: 'row',
                                 alignItems: 'center',
                                 backgroundColor: 'white',
                                 borderWidth: 2,
-                                borderColor: '#A50064',
+                                borderColor: '#2F9B65',
                                 borderRadius: 20,
                                 padding: 20,
                             }}
@@ -151,20 +158,18 @@ const PaymentMethodModal = ({
                                     width: 60,
                                     height: 60,
                                     borderRadius: 15,
-                                    backgroundColor: '#A50064',
+                                    backgroundColor: '#E8F5E9',
                                     justifyContent: 'center',
                                     alignItems: 'center',
                                     marginRight: 15,
                                 }}
                             >
-                                <Text style={{ fontSize: 28, color: 'white', fontWeight: 'bold' }}>
-                                    M
-                                </Text>
+                                <Text style={{ fontSize: 32 }}>📱</Text>
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text className="base-bold text-dark-100">Ví Momo</Text>
+                                <Text className="base-bold text-dark-100">QR Code Payment</Text>
                                 <Text className="body-regular text-gray-200">
-                                    Thanh toán qua ví điện tử Momo
+                                    Scan QR to pay via banking app
                                 </Text>
                             </View>
                             <Image
@@ -174,7 +179,7 @@ const PaymentMethodModal = ({
                             />
                         </TouchableOpacity>
 
-                        {/* Card */}
+                        {/* Card Payment */}
                         <TouchableOpacity
                             onPress={() => handleSelect('card')}
                             style={{
@@ -206,9 +211,9 @@ const PaymentMethodModal = ({
                                 />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text className="base-bold text-dark-100">Thẻ ATM/Credit</Text>
+                                <Text className="base-bold text-dark-100">Debit/Credit Card</Text>
                                 <Text className="body-regular text-gray-200">
-                                    Thanh toán bằng thẻ ngân hàng
+                                    Pay with your bank card
                                 </Text>
                             </View>
                             <Image
@@ -218,7 +223,7 @@ const PaymentMethodModal = ({
                             />
                         </TouchableOpacity>
 
-                        {/* COD */}
+                        {/* Cash on Delivery */}
                         <TouchableOpacity
                             onPress={() => handleSelect('cod')}
                             style={{
@@ -226,7 +231,7 @@ const PaymentMethodModal = ({
                                 alignItems: 'center',
                                 backgroundColor: 'white',
                                 borderWidth: 2,
-                                borderColor: '#2F9B65',
+                                borderColor: '#878787',
                                 borderRadius: 20,
                                 padding: 20,
                             }}
@@ -236,23 +241,18 @@ const PaymentMethodModal = ({
                                     width: 60,
                                     height: 60,
                                     borderRadius: 15,
-                                    backgroundColor: '#E8F5E9',
+                                    backgroundColor: '#F3F4F6',
                                     justifyContent: 'center',
                                     alignItems: 'center',
                                     marginRight: 15,
                                 }}
                             >
-                                <Image
-                                    source={images.dollar}
-                                    style={{ width: 30, height: 30 }}
-                                    resizeMode="contain"
-                                    tintColor="#2F9B65"
-                                />
+                                <Text style={{ fontSize: 32 }}>💵</Text>
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text className="base-bold text-dark-100">Tiền mặt (COD)</Text>
+                                <Text className="base-bold text-dark-100">Cash on Delivery</Text>
                                 <Text className="body-regular text-gray-200">
-                                    Thanh toán khi nhận hàng
+                                    Pay when you receive order
                                 </Text>
                             </View>
                             <Image
