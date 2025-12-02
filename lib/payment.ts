@@ -1,21 +1,39 @@
-// lib/payment.ts - COMPLETE FIXED VERSION
+// lib/payment.ts - STATIC QR CODE VERSION
 
 import { ID, Query } from 'react-native-appwrite';
 import { appwriteConfig, databases } from './appwrite';
 import { CreateOrderParams, Order } from '@/type';
-import CryptoJS from 'crypto-js';
 
 const ORDERS_COLLECTION_ID = process.env.EXPO_PUBLIC_APPWRITE_ORDERS_COLLECTION_ID!;
 
-// ✅ MOMO CONFIG - PRODUCTION
-const MOMO_CONFIG = {
+// ✅ MOMO STATIC QR CONFIG - PRODUCTION với Deep Link
+const MOMO_STATIC_QR = {
     partnerCode: 'MOMOEWN820251130',
-    accessKey: 'bxpIpXsB5FM0vn5R',
-    secretKey: '6YIKQUjACi9LBHerKQvTZXcBkEY3NEpq',
-    endpoint: 'https://payment.momo.vn/v2/gateway/api/create', // ⚠️ TEST environment
-    redirectUrl: 'myapp://payment-result',
-    ipnUrl: 'https://momo-backend-1.vercel.app/api/momo-webhook',
+    storeName: 'AKESHOP',
+    phoneNumber: '0896494752',
+    qrCodeId: '2618615',
+    storeCode: 'Y5jsCuVYUpbrzOsW',
 };
+
+/**
+ * ✅ Generate Momo Deep Link với amount và comment tự động
+ */
+function generateMomoDeepLink(amount: number, orderNumber: string): string {
+    const phone = MOMO_STATIC_QR.phoneNumber;
+    const comment = encodeURIComponent(`Order ${orderNumber}`);
+    
+    // Momo App Deep Link format
+    return `momo://app?action=transfer&phone=${phone}&amount=${amount}&comment=${comment}`;
+}
+
+/**
+ * ✅ Generate QR Code URL (dùng API khác)
+ */
+function generateQRCodeUrl(deepLink: string): string {
+    const encodedLink = encodeURIComponent(deepLink);
+    // Dùng API QR code generator miễn phí
+    return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodedLink}`;
+}
 
 /**
  * Generate unique order number
@@ -27,140 +45,58 @@ function generateOrderNumber(): string {
 }
 
 /**
- * ✅ FIXED: Create Momo Payment với captureWallet (không bị bug dấu chấm)
+ * ✅ STATIC QR PAYMENT - Generate deep link với amount và comment
  */
-export async function createMomoPayment(
+export async function createStaticQRPayment(
     orderNumber: string, 
     amount: number
 ): Promise<{
     success: boolean;
-    payUrl?: string;
-    deeplink?: string;
     qrCodeUrl?: string;
+    deepLink?: string;
     message?: string;
+    orderId?: string;
 }> {
     try {
-        const amountInt = Math.round(amount);
-        if (amountInt < 1000) {
+        if (amount < 1000) {
             return {
                 success: false,
                 message: 'Minimum amount is 1,000đ',
             };
         }
 
-        const requestId = `${orderNumber}_${Date.now()}`;
-        const orderInfo = `Payment ${orderNumber}`;
-        const extraData = '';
-        const requestType = 'captureWallet'; // ✅ BACK TO captureWallet - Stable
+        console.log('✅ Using Static QR Payment');
+        console.log('💰 Amount:', amount.toLocaleString('vi-VN') + 'đ');
+        console.log('🏪 Store:', MOMO_STATIC_QR.storeName);
+        console.log('📝 Order:', orderNumber);
 
-        // ✅ Build raw signature string - EXACT alphabet order
-        const rawSignature = 
-            `accessKey=${MOMO_CONFIG.accessKey}` +
-            `&amount=${amountInt}` +
-            `&extraData=${extraData}` +
-            `&ipnUrl=${MOMO_CONFIG.ipnUrl}` +
-            `&orderId=${orderNumber}` +
-            `&orderInfo=${orderInfo}` +
-            `&partnerCode=${MOMO_CONFIG.partnerCode}` +
-            `&redirectUrl=${MOMO_CONFIG.redirectUrl}` +
-            `&requestId=${requestId}` +
-            `&requestType=${requestType}`;
+        // ✅ Generate Momo Deep Link với amount + comment
+        const deepLink = generateMomoDeepLink(amount, orderNumber);
+        
+        // ✅ Generate QR Code từ deep link
+        const qrCodeUrl = generateQRCodeUrl(deepLink);
 
-        const signature = CryptoJS.HmacSHA256(
-            rawSignature, 
-            MOMO_CONFIG.secretKey
-        ).toString();
+        console.log('🔗 Deep Link:', deepLink);
+        console.log('📱 QR Code URL:', qrCodeUrl);
 
-        const requestBody = {
-            partnerCode: MOMO_CONFIG.partnerCode,
-            partnerName: 'Food Delivery',
-            storeId: 'FoodStore01',
-            requestId: requestId,
-            amount: amountInt,
+        return {
+            success: true,
+            qrCodeUrl,
+            deepLink,
             orderId: orderNumber,
-            orderInfo: orderInfo,
-            redirectUrl: MOMO_CONFIG.redirectUrl,
-            ipnUrl: MOMO_CONFIG.ipnUrl,
-            lang: 'en',
-            requestType: requestType,
-            autoCapture: true,
-            extraData: extraData,
-            signature: signature,
         };
 
-        console.log('📤 Momo Request:', { orderNumber, amount: amountInt });
-        console.log('🔐 Signature:', signature);
-
-        const response = await fetch(MOMO_CONFIG.endpoint, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody),
-        });
-
-        const responseText = await response.text();
-        console.log('📥 Momo Response:', responseText);
-
-        if (!response.ok) {
-            return {
-                success: false,
-                message: `HTTP Error ${response.status}`,
-            };
-        }
-
-        let result;
-        try {
-            result = JSON.parse(responseText);
-        } catch (e) {
-            return {
-                success: false,
-                message: 'Unable to parse response',
-            };
-        }
-
-        if (result.resultCode === 0) {
-            console.log('✅ Payment created successfully');
-            return {
-                success: true,
-                payUrl: result.payUrl,
-                deeplink: result.deeplink,
-                qrCodeUrl: result.qrCodeUrl,
-            };
-        } else {
-            const errorMessages: { [key: number]: string } = {
-                10: 'System maintenance',
-                11: 'Access denied',
-                13: 'Merchant authentication failed',
-                20: 'Invalid amount',
-                40: 'Duplicate requestId',
-                41: 'Duplicate orderId',
-                1000: 'User declined payment',
-                1001: 'Insufficient balance',
-                9000: 'Transaction processing',
-                11007: 'Invalid signature - Check your API keys',
-            };
-
-            const errorMessage = errorMessages[result.resultCode] || result.message || 'Payment failed';
-            
-            console.error('❌ Momo Error:', result.resultCode, errorMessage);
-
-            return {
-                success: false,
-                message: errorMessage,
-            };
-        }
     } catch (error: any) {
         console.error('❌ Payment error:', error);
         return {
             success: false,
-            message: error.message || 'Unable to connect to Momo',
+            message: error.message || 'Unable to create payment',
         };
     }
 }
 
 /**
- * Polling payment status
+ * ✅ Polling payment status - Check every 3s
  */
 export async function pollPaymentStatus(
     orderId: string, 
@@ -178,15 +114,18 @@ export async function pollPaymentStatus(
                 
                 if (order) {
                     if (order.payment_status === 'paid') {
+                        console.log('✅ Payment confirmed via webhook!');
                         clearInterval(interval);
                         resolve(true);
                     } else if (order.payment_status === 'failed') {
+                        console.log('❌ Payment failed');
                         clearInterval(interval);
                         resolve(false);
                     }
                 }
                 
                 if (attempts >= maxAttempts) {
+                    console.log('⏰ Polling timeout');
                     clearInterval(interval);
                     resolve(false);
                 }
@@ -200,6 +139,9 @@ export async function pollPaymentStatus(
     });
 }
 
+/**
+ * Create order in Appwrite
+ */
 export async function createOrder(userId: string, params: CreateOrderParams): Promise<Order> {
     try {
         const orderNumber = generateOrderNumber();
@@ -221,7 +163,7 @@ export async function createOrder(userId: string, params: CreateOrderParams): Pr
                 delivery_notes: params.delivery_notes || '',
                 payment_method: params.payment_method,
                 payment_status: 'pending',
-                qr_code_url: '',
+                qr_code_url: '', // Will be generated dynamically
                 order_status: 'pending',
             }
         );
@@ -271,7 +213,8 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
 export async function updatePaymentStatus(
     orderId: string,
     status: 'paid' | 'failed',
-    transactionId?: string
+    transactionId?: string,
+    receivedAmount?: number
 ): Promise<void> {
     try {
         await databases.updateDocument(
@@ -283,10 +226,11 @@ export async function updatePaymentStatus(
                 transaction_id: transactionId || '',
                 paid_at: status === 'paid' ? new Date().toISOString() : '',
                 order_status: status === 'paid' ? 'confirmed' : 'pending',
+                received_amount: receivedAmount || 0,
             }
         );
         
-        console.log('✅ Payment status updated:', status);
+        console.log(`✅ Payment status updated: ${status}`);
     } catch (error: any) {
         console.error('❌ Update payment error:', error);
         throw new Error(error.message || 'Unable to update payment');

@@ -1,4 +1,4 @@
-// server.js - FIXED BACKEND FOR VERCEL
+// server.js - COMPLETE FIXED VERSION
 
 const express = require('express');
 const crypto = require('crypto');
@@ -21,11 +21,12 @@ app.use((req, res, next) => {
     next();
 });
 
-// ✅ Momo Config - MUST MATCH payment.ts
+// ✅ Momo Production - Static QR không cần credentials
+// Webhook sẽ nhận data từ Momo khi user chuyển tiền
 const MOMO_CONFIG = {
-    partnerCode: 'MOMOEWN820251130',
-    accessKey: 'bxpIpXsB5FM0vn5R',
-    secretKey: '6YIKQUjACi9LBHerKQvTZXcBkEY3NEpq',
+    partnerCode: 'MOMOEWN820251130', // Production
+    storeName: 'AKESHOP',
+    phoneNumber: '0896494752',
 };
 
 // ✅ Appwrite Config
@@ -34,7 +35,6 @@ const APPWRITE_CONFIG = {
     projectId: '69230ad2001fb8f2aee4',
     databaseId: '68629ae60038a7c61fe4',
     ordersCollectionId: 'orders',
-    // ⚠️ SET THIS IN VERCEL ENVIRONMENT VARIABLES
     apiKey: process.env.APPWRITE_API_KEY || 'standard_c9f94d4e2c13a8df7325ae8914bdb6c4f17d92af7461d2bae9e4cc0bdac9395bbabfd5b87f9ab9eb596c1ea9cac286442d954c5fec5eb795f47879bce69539ed12224544b1d5f50d597536a8a06c50df0bddbd91f6c8b0aca3739eb2b2131fd89bf1b7bc86585cdd52c161e22cb602278e5d45d7b87ebbdfdee3be3b8d1df7a1',
 };
 
@@ -51,30 +51,32 @@ app.get('/', (req, res) => {
 });
 
 /**
- * ✅ WEBHOOK ENDPOINT - Momo calls this when payment succeeds
+ * ✅ WEBHOOK ENDPOINT - Momo calls when user transfers money
  */
 app.post('/api/momo-webhook', async (req, res) => {
     try {
-        console.log('📥 Webhook received:', JSON.stringify(req.body, null, 2));
+        console.log('📥 ========== WEBHOOK RECEIVED ==========');
+        console.log('Full Body:', JSON.stringify(req.body, null, 2));
+        console.log('Headers:', JSON.stringify(req.headers, null, 2));
 
         const {
             partnerCode,
-            orderId,
-            requestId,
             amount,
-            orderInfo,
-            orderType,
+            comment, // ← Nội dung chuyển khoản
+            desc, // ← Alternative field
             transId,
-            resultCode,
-            message,
-            payType,
-            responseTime,
-            extraData,
-            signature,
+            momoTransId,
+            phone,
         } = req.body;
 
+        // Extract comment from either field
+        const transferNote = comment || desc || '';
+
+        console.log('💰 Amount:', amount);
+        console.log('📝 Transfer note:', transferNote);
+
         // ❌ Check missing fields
-        if (!orderId || !transId || resultCode === undefined) {
+        if (!amount || !transId) {
             console.error('❌ Missing required fields');
             return res.status(400).json({
                 message: 'Missing required fields',
@@ -82,73 +84,82 @@ app.post('/api/momo-webhook', async (req, res) => {
             });
         }
 
-        // 1️⃣ Verify signature
-        // ✅ Raw signature for IPN (verify signature)
-        const rawSignature =
-            `accessKey=${partnerCode === MOMO_CONFIG.partnerCode ? MOMO_CONFIG.accessKey : partnerCode}` +
-            `&amount=${amount}` +
-            `&extraData=${extraData}` +
-            `&orderId=${orderId}` +
-            `&orderInfo=${orderInfo}` +
-            `&orderType=${orderType}` +
-            `&partnerCode=${partnerCode}` +
-            `&payType=${payType}` +
-            `&requestId=${requestId}` +
-            `&responseTime=${responseTime}` +
-            `&resultCode=${resultCode}` +
-            `&transId=${transId}`;
-
-
-        const expectedSignature = crypto
-            .createHmac('sha256', MOMO_CONFIG.secretKey)
-            .update(rawSignature)
-            .digest('hex');
-
-        console.log('🔐 Expected signature:', expectedSignature);
-        console.log('🔐 Received signature:', signature);
-
-        if (signature !== expectedSignature) {
-            console.error('❌ Invalid signature!');
-            return res.status(403).json({
-                message: 'Invalid signature',
-                resultCode: 97
-            });
+        // ✅ Extract order number (try multiple patterns)
+        let orderNumber = null;
+        
+        // Pattern 1: ORD123456789
+        const match1 = transferNote.match(/ORD\d+/i);
+        if (match1) orderNumber = match1[0].toUpperCase();
+        
+        // Pattern 2: Order ORD123456789
+        if (!orderNumber) {
+            const match2 = transferNote.match(/Order\s+(ORD\d+)/i);
+            if (match2) orderNumber = match2[1].toUpperCase();
+        }
+        
+        // Pattern 3: Just numbers after "Order"
+        if (!orderNumber) {
+            const match3 = transferNote.match(/Order\s+(\d+)/i);
+            if (match3) orderNumber = `ORD${match3[1]}`;
         }
 
-        // 2️⃣ Check payment status
-        if (resultCode !== 0) {
-            console.error('❌ Payment failed:', message);
+        console.log('🔍 Extracted order number:', orderNumber);
 
-            await updateOrderPaymentStatus(orderId, transId, 'failed');
-
-            return res.status(200).json({
-                message: 'Payment failed but processed',
-                resultCode: 0
-            });
-        }
-
-        console.log('✅ Payment verified!', {
-            orderId,
-            transId,
-            amount: `${amount.toLocaleString('vi-VN')}đ`,
-        });
-
-        // 3️⃣ Update order
-        const updated = await updateOrderPaymentStatus(orderId, transId, 'paid');
-
-        if (!updated) {
-            console.error('❌ Failed to update order');
-            return res.status(500).json({
-                message: 'Failed to update order',
+        if (!orderNumber) {
+            console.error('❌ Order number not found in comment:', transferNote);
+            return res.status(400).json({
+                message: 'Order number not found in transfer note',
                 resultCode: 1
             });
         }
 
-        // 4️⃣ SUCCESS - Return to Momo
-        return res.status(200).json({
-            message: 'OK',
-            resultCode: 0,
-        });
+        // ✅ Find order in Appwrite
+        const order = await findOrderByNumber(orderNumber);
+
+        if (!order) {
+            console.error('❌ Order not found:', orderNumber);
+            return res.status(404).json({
+                message: 'Order not found',
+                resultCode: 1
+            });
+        }
+
+        console.log('📦 Order found:', order.$id);
+        console.log('💵 Expected amount:', order.total);
+        console.log('💵 Received amount:', amount);
+
+        // ✅ Compare amounts
+        if (amount >= order.total) {
+            // SUCCESS - Amount matches or exceeds
+            await updateOrderPaymentStatus(
+                order.$id, 
+                transId, 
+                'paid',
+                amount
+            );
+
+            console.log('✅ Payment confirmed!');
+
+            return res.status(200).json({
+                message: 'OK',
+                resultCode: 0,
+            });
+        } else {
+            // FAILED - Insufficient amount
+            console.error('❌ Insufficient amount');
+            
+            await updateOrderPaymentStatus(
+                order.$id, 
+                transId, 
+                'failed',
+                amount
+            );
+
+            return res.status(200).json({
+                message: 'Insufficient amount',
+                resultCode: 1
+            });
+        }
 
     } catch (error) {
         console.error('❌ Webhook error:', error);
@@ -160,9 +171,44 @@ app.post('/api/momo-webhook', async (req, res) => {
 });
 
 /**
+ * Find order by order_number
+ */
+async function findOrderByNumber(orderNumber) {
+    try {
+        if (!APPWRITE_CONFIG.apiKey) {
+            console.error('❌ APPWRITE_API_KEY not set!');
+            return null;
+        }
+
+        const client = new Client()
+            .setEndpoint(APPWRITE_CONFIG.endpoint)
+            .setProject(APPWRITE_CONFIG.projectId)
+            .setKey(APPWRITE_CONFIG.apiKey);
+
+        const databases = new Databases(client);
+
+        const orders = await databases.listDocuments(
+            APPWRITE_CONFIG.databaseId,
+            APPWRITE_CONFIG.ordersCollectionId,
+            [Query.equal('order_number', orderNumber)]
+        );
+
+        if (orders.documents.length === 0) {
+            return null;
+        }
+
+        return orders.documents[0];
+
+    } catch (error) {
+        console.error('❌ Find order error:', error.message);
+        return null;
+    }
+}
+
+/**
  * Update order payment status in Appwrite
  */
-async function updateOrderPaymentStatus(orderId, transId, status) {
+async function updateOrderPaymentStatus(orderId, transId, status, receivedAmount = 0) {
     try {
         if (!APPWRITE_CONFIG.apiKey) {
             console.error('❌ APPWRITE_API_KEY not set!');
@@ -176,28 +222,14 @@ async function updateOrderPaymentStatus(orderId, transId, status) {
 
         const databases = new Databases(client);
 
-        // Find order by order_number
-        const orders = await databases.listDocuments(
-            APPWRITE_CONFIG.databaseId,
-            APPWRITE_CONFIG.ordersCollectionId,
-            [Query.equal('order_number', orderId)]
-        );
-
-        if (orders.documents.length === 0) {
-            console.error('❌ Order not found:', orderId);
-            return false;
-        }
-
-        const order = orders.documents[0];
-
-        // Update payment status
         await databases.updateDocument(
             APPWRITE_CONFIG.databaseId,
             APPWRITE_CONFIG.ordersCollectionId,
-            order.$id,
+            orderId,
             {
                 payment_status: status,
                 transaction_id: transId,
+                received_amount: receivedAmount,
                 paid_at: status === 'paid' ? new Date().toISOString() : '',
                 order_status: status === 'paid' ? 'confirmed' : 'pending',
             }

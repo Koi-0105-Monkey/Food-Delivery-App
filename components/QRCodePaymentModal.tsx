@@ -1,4 +1,4 @@
-// components/QRCodePaymentModal.tsx - NEW COMPONENT
+// components/QRCodePaymentModal.tsx - STATIC QR VERSION
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -12,9 +12,10 @@ import {
     ScrollView,
     Alert,
     ActivityIndicator,
+    Linking,
 } from 'react-native';
 import { images } from '@/constants';
-import { createMomoPayment, pollPaymentStatus } from '@/lib/payment';
+import { createStaticQRPayment, pollPaymentStatus } from '@/lib/payment';
 
 interface QRCodePaymentModalProps {
     visible: boolean;
@@ -38,6 +39,7 @@ const QRCodePaymentModal = ({
     
     const [isLoading, setIsLoading] = useState(false);
     const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+    const [deepLink, setDeepLink] = useState<string | null>(null);
 
     useEffect(() => {
         if (visible) {
@@ -57,7 +59,6 @@ const QRCodePaymentModal = ({
                 }),
             ]).start();
 
-            // Generate QR Code
             initQRPayment();
         } else {
             slideAnim.setValue(Dimensions.get('window').height);
@@ -69,10 +70,12 @@ const QRCodePaymentModal = ({
         try {
             setIsLoading(true);
 
-            const result = await createMomoPayment(orderNumber, totalAmount);
+            const result = await createStaticQRPayment(orderNumber, totalAmount);
 
             if (result.success && result.qrCodeUrl) {
                 setQrCodeUrl(result.qrCodeUrl);
+                setDeepLink(result.deepLink || null);
+                
                 // Start polling
                 startPolling();
             } else {
@@ -86,8 +89,28 @@ const QRCodePaymentModal = ({
         }
     };
 
+    const handleOpenMomo = async () => {
+        if (!deepLink) return;
+
+        try {
+            const canOpen = await Linking.canOpenURL(deepLink);
+            
+            if (canOpen) {
+                await Linking.openURL(deepLink);
+            } else {
+                Alert.alert(
+                    'Momo App Required',
+                    'Please install Momo app to use this feature.'
+                );
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Cannot open Momo app');
+        }
+    };
+
     const startPolling = async () => {
         try {
+            // Poll for 3 minutes (60 attempts x 3s)
             const success = await pollPaymentStatus(orderId, 60);
 
             if (success) {
@@ -100,7 +123,7 @@ const QRCodePaymentModal = ({
             } else {
                 Alert.alert(
                     'Timeout',
-                    'Payment confirmation not received. Please check again.'
+                    'Payment confirmation not received. Please check your order in profile.'
                 );
             }
         } catch (error) {
@@ -129,7 +152,7 @@ const QRCodePaymentModal = ({
 
     return (
         <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={handleClose}>
+            <View style={{ flex: 1 }}>
                 <Animated.View
                     style={{
                         flex: 1,
@@ -137,7 +160,7 @@ const QRCodePaymentModal = ({
                         opacity: opacityAnim,
                     }}
                 />
-            </TouchableOpacity>
+            </View>
 
             <Animated.View
                 style={{
@@ -169,7 +192,7 @@ const QRCodePaymentModal = ({
                     }}
                 >
                     <View style={{ flex: 1 }}>
-                        <Text className="h3-bold text-dark-100">QR Code Payment</Text>
+                        <Text className="h3-bold text-dark-100">Scan QR to Pay</Text>
                         <Text className="body-regular text-gray-200 mt-1">
                             Order: {orderNumber}
                         </Text>
@@ -188,12 +211,12 @@ const QRCodePaymentModal = ({
                     <View className="flex-1 flex-center">
                         <ActivityIndicator size="large" color="#FE8C00" />
                         <Text className="paragraph-medium text-gray-200 mt-4">
-                            Generating QR code...
+                            Loading QR code...
                         </Text>
                     </View>
                 ) : (
                     <ScrollView contentContainerStyle={{ padding: 30 }}>
-                        {/* Amount Display */}
+                        {/* Amount Display - FIX layout */}
                         <View
                             style={{
                                 backgroundColor: '#FFF5E6',
@@ -204,10 +227,38 @@ const QRCodePaymentModal = ({
                             }}
                         >
                             <Text className="body-medium text-gray-200 mb-2">Amount to Pay</Text>
-                            <Text className="h1-bold text-primary" style={{ fontSize: 36 }}>
+                            <Text 
+                                className="text-primary" 
+                                style={{ 
+                                    fontSize: 32,
+                                    fontWeight: 'bold',
+                                    lineHeight: 40,
+                                }}
+                            >
                                 {totalAmount.toLocaleString('vi-VN')}đ
                             </Text>
                         </View>
+
+                        {/* Open Momo Button */}
+                        <TouchableOpacity
+                            onPress={handleOpenMomo}
+                            style={{
+                                backgroundColor: '#D82D8B',
+                                borderRadius: 20,
+                                paddingVertical: 16,
+                                paddingHorizontal: 24,
+                                marginBottom: 20,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 12,
+                            }}
+                        >
+                            <Text style={{ fontSize: 28 }}>📱</Text>
+                            <Text className="base-bold text-white">
+                                Open Momo App
+                            </Text>
+                        </TouchableOpacity>
 
                         {/* QR Code */}
                         {qrCodeUrl ? (
@@ -224,11 +275,11 @@ const QRCodePaymentModal = ({
                             >
                                 <Image
                                     source={{ uri: qrCodeUrl }}
-                                    style={{ width: 280, height: 280 }}
+                                    style={{ width: 300, height: 300 }}
                                     resizeMode="contain"
                                 />
                                 <Text className="paragraph-semibold text-dark-100 mt-4 text-center">
-                                    Scan this QR code with your banking app
+                                    Or scan with Momo app
                                 </Text>
                             </View>
                         ) : null}
@@ -239,18 +290,42 @@ const QRCodePaymentModal = ({
                                 backgroundColor: '#E8F5E9',
                                 borderRadius: 15,
                                 padding: 20,
+                                marginBottom: 20,
                             }}
                         >
                             <Text className="paragraph-bold text-dark-100 mb-3">
-                                ✅ How to pay:
+                                ✅ Payment completed automatically:
                             </Text>
                             <Text className="body-regular text-gray-200">
-                                1. Open your banking app{'\n'}
-                                2. Scan the QR code above{'\n'}
-                                3. Confirm the payment{'\n'}
-                                4. Wait for confirmation (automatic){'\n'}
-                                5. Do not close this screen
+                                1. Click "Open Momo App" above{'\n'}
+                                2. Amount & note are pre-filled{'\n'}
+                                3. Confirm payment in Momo{'\n'}
+                                4. Wait for confirmation (auto){'\n'}
+                                {'\n'}
+                                <Text className="base-bold">Or scan QR code below</Text>
                             </Text>
+                        </View>
+
+                        {/* Warning */}
+                        <View
+                            style={{
+                                backgroundColor: '#FFF5E6',
+                                borderRadius: 15,
+                                padding: 15,
+                                flexDirection: 'row',
+                                alignItems: 'flex-start',
+                                gap: 10,
+                                marginBottom: 20,
+                            }}
+                        >
+                            <Text style={{ fontSize: 24 }}>ℹ️</Text>
+                            <View style={{ flex: 1 }}>
+                                <Text className="body-medium text-dark-100">
+                                    <Text className="base-bold">Note:</Text> Order number{' '}
+                                    <Text className="base-bold text-primary">{orderNumber}</Text>
+                                    {' '}will be auto-filled when using "Open Momo App" button
+                                </Text>
+                            </View>
                         </View>
 
                         {/* Loading Animation */}

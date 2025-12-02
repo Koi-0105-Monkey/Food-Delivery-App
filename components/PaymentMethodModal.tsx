@@ -69,23 +69,41 @@ const PaymentMethodModal = ({
         });
     };
 
+    // ✅ FIX: Prevent re-render during animation
     const handleSelect = (method: PaymentMethod) => {
-        handleClose();
-        // Delay để animation hoàn thành trước khi trigger tiếp
-        setTimeout(() => {
-            onSelectMethod(method);
-        }, 300);
+        // Close first
+        Animated.parallel([
+            Animated.timing(slideAnim, {
+                toValue: Dimensions.get('window').height,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+            Animated.timing(opacityAnim, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+        ]).start(() => {
+            // Then call after animation completes
+            onClose();
+            setTimeout(() => {
+                onSelectMethod(method);
+            }, 100);
+        });
     };
 
     if (!visible) return null;
 
     return (
-        <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-            <TouchableOpacity 
-                style={{ flex: 1 }} 
-                activeOpacity={1} 
-                onPress={handleClose}
-            >
+        <Modal 
+            visible={visible} 
+            transparent 
+            animationType="none" 
+            onRequestClose={handleClose}
+            statusBarTranslucent
+        >
+            {/* Backdrop - ✅ Remove onPress to prevent warning */}
+            <View style={{ flex: 1 }}>
                 <Animated.View
                     style={{
                         flex: 1,
@@ -93,8 +111,9 @@ const PaymentMethodModal = ({
                         opacity: opacityAnim,
                     }}
                 />
-            </TouchableOpacity>
+            </View>
 
+            {/* Modal Content */}
             <Animated.View
                 style={{
                     position: 'absolute',

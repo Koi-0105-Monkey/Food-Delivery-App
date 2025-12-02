@@ -1,4 +1,4 @@
-// app/(tabs)/cart.tsx - FIXED VERSION (ENGLISH)
+// app/(tabs)/cart.tsx - STATIC QR VERSION
 
 import { View, Text, FlatList, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -94,7 +94,7 @@ const Cart = () => {
                 total,
                 delivery_address: defaultAddress?.fullAddress || '',
                 delivery_phone: user.phone || '',
-                payment_method: method === 'qr' ? 'momo' : method, // Backend still uses 'momo'
+                payment_method: method === 'qr' ? 'momo' : method,
             });
 
             setCurrentOrder(order);
@@ -115,7 +115,7 @@ const Cart = () => {
                     ]
                 );
             } else if (method === 'qr') {
-                // QR Code Payment
+                // ✅ Static QR Payment - Show modal with QR code
                 setShowQRModal(true);
             } else if (method === 'card') {
                 // Card Payment
@@ -256,7 +256,7 @@ const Cart = () => {
                 />
             )}
 
-            {/* QR Code Payment Modal */}
+            {/* QR Code Payment Modal - Static QR */}
             {currentOrder && showQRModal && (
                 <QRCodePaymentModal
                     visible={showQRModal}
