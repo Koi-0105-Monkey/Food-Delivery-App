@@ -1,39 +1,11 @@
-// lib/payment.ts - STATIC QR CODE VERSION
+// lib/payment.ts - SIMPLE QR PAYMENT
 
 import { ID, Query } from 'react-native-appwrite';
 import { appwriteConfig, databases } from './appwrite';
 import { CreateOrderParams, Order } from '@/type';
+import { generatePaymentQR } from './vietqr-payment';
 
 const ORDERS_COLLECTION_ID = process.env.EXPO_PUBLIC_APPWRITE_ORDERS_COLLECTION_ID!;
-
-// ✅ MOMO STATIC QR CONFIG - PRODUCTION với Deep Link
-const MOMO_STATIC_QR = {
-    partnerCode: 'MOMOEWN820251130',
-    storeName: 'AKESHOP',
-    phoneNumber: '0896494752',
-    qrCodeId: '2618615',
-    storeCode: 'Y5jsCuVYUpbrzOsW',
-};
-
-/**
- * ✅ Generate Momo Deep Link với amount và comment tự động
- */
-function generateMomoDeepLink(amount: number, orderNumber: string): string {
-    const phone = MOMO_STATIC_QR.phoneNumber;
-    const comment = encodeURIComponent(`Order ${orderNumber}`);
-    
-    // Momo App Deep Link format
-    return `momo://app?action=transfer&phone=${phone}&amount=${amount}&comment=${comment}`;
-}
-
-/**
- * ✅ Generate QR Code URL (dùng API khác)
- */
-function generateQRCodeUrl(deepLink: string): string {
-    const encodedLink = encodeURIComponent(deepLink);
-    // Dùng API QR code generator miễn phí
-    return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodedLink}`;
-}
 
 /**
  * Generate unique order number
@@ -45,15 +17,15 @@ function generateOrderNumber(): string {
 }
 
 /**
- * ✅ STATIC QR PAYMENT - Generate deep link với amount và comment
+ * ✅ TẠO QR PAYMENT - Trả về cả Momo và Agribank QR
  */
-export async function createStaticQRPayment(
+export async function createQRPayment(
     orderNumber: string, 
     amount: number
 ): Promise<{
     success: boolean;
-    qrCodeUrl?: string;
-    deepLink?: string;
+    momo?: any;
+    agribank?: any;
     message?: string;
     orderId?: string;
 }> {
@@ -61,28 +33,24 @@ export async function createStaticQRPayment(
         if (amount < 1000) {
             return {
                 success: false,
-                message: 'Minimum amount is 1,000đ',
+                message: 'Số tiền tối thiểu là 1,000đ',
             };
         }
 
-        console.log('✅ Using Static QR Payment');
-        console.log('💰 Amount:', amount.toLocaleString('vi-VN') + 'đ');
-        console.log('🏪 Store:', MOMO_STATIC_QR.storeName);
-        console.log('📝 Order:', orderNumber);
+        console.log('✅ Tạo QR Payment');
+        console.log('💰 Số tiền:', amount.toLocaleString('vi-VN') + 'đ');
+        console.log('📝 Đơn hàng:', orderNumber);
 
-        // ✅ Generate Momo Deep Link với amount + comment
-        const deepLink = generateMomoDeepLink(amount, orderNumber);
-        
-        // ✅ Generate QR Code từ deep link
-        const qrCodeUrl = generateQRCodeUrl(deepLink);
+        // Generate QR codes
+        const paymentData = generatePaymentQR(amount, orderNumber);
 
-        console.log('🔗 Deep Link:', deepLink);
-        console.log('📱 QR Code URL:', qrCodeUrl);
+        console.log('📱 Momo QR:', paymentData.momo.qrCodeUrl);
+        console.log('🏦 Agribank QR:', paymentData.agribank.qrCodeUrl);
 
         return {
             success: true,
-            qrCodeUrl,
-            deepLink,
+            momo: paymentData.momo,
+            agribank: paymentData.agribank,
             orderId: orderNumber,
         };
 
@@ -90,13 +58,13 @@ export async function createStaticQRPayment(
         console.error('❌ Payment error:', error);
         return {
             success: false,
-            message: error.message || 'Unable to create payment',
+            message: error.message || 'Không thể tạo thanh toán',
         };
     }
 }
 
 /**
- * ✅ Polling payment status - Check every 3s
+ * ✅ Polling payment status - Check mỗi 3s
  */
 export async function pollPaymentStatus(
     orderId: string, 
@@ -114,18 +82,18 @@ export async function pollPaymentStatus(
                 
                 if (order) {
                     if (order.payment_status === 'paid') {
-                        console.log('✅ Payment confirmed via webhook!');
+                        console.log('✅ Thanh toán thành công qua webhook!');
                         clearInterval(interval);
                         resolve(true);
                     } else if (order.payment_status === 'failed') {
-                        console.log('❌ Payment failed');
+                        console.log('❌ Thanh toán thất bại');
                         clearInterval(interval);
                         resolve(false);
                     }
                 }
                 
                 if (attempts >= maxAttempts) {
-                    console.log('⏰ Polling timeout');
+                    console.log('⏰ Hết thời gian chờ');
                     clearInterval(interval);
                     resolve(false);
                 }
@@ -140,7 +108,7 @@ export async function pollPaymentStatus(
 }
 
 /**
- * Create order in Appwrite
+ * Tạo order
  */
 export async function createOrder(userId: string, params: CreateOrderParams): Promise<Order> {
     try {
@@ -163,16 +131,16 @@ export async function createOrder(userId: string, params: CreateOrderParams): Pr
                 delivery_notes: params.delivery_notes || '',
                 payment_method: params.payment_method,
                 payment_status: 'pending',
-                qr_code_url: '', // Will be generated dynamically
+                qr_code_url: '',
                 order_status: 'pending',
             }
         );
         
-        console.log('✅ Order created:', orderNumber);
+        console.log('✅ Đơn hàng đã tạo:', orderNumber);
         return orderDoc as Order;
     } catch (error: any) {
-        console.error('❌ Create order error:', error);
-        throw new Error(error.message || 'Unable to create order');
+        console.error('❌ Lỗi tạo đơn:', error);
+        throw new Error(error.message || 'Không thể tạo đơn hàng');
     }
 }
 
@@ -230,69 +198,9 @@ export async function updatePaymentStatus(
             }
         );
         
-        console.log(`✅ Payment status updated: ${status}`);
+        console.log(`✅ Cập nhật trạng thái: ${status}`);
     } catch (error: any) {
         console.error('❌ Update payment error:', error);
-        throw new Error(error.message || 'Unable to update payment');
-    }
-}
-
-export async function updateOrderStatus(
-    orderId: string,
-    status: 'pending' | 'confirmed' | 'preparing' | 'delivering' | 'completed' | 'cancelled'
-): Promise<void> {
-    try {
-        await databases.updateDocument(
-            appwriteConfig.databaseId,
-            ORDERS_COLLECTION_ID,
-            orderId,
-            { order_status: status }
-        );
-        
-        console.log('✅ Order status updated:', status);
-    } catch (error: any) {
-        console.error('❌ Update order status error:', error);
-        throw new Error(error.message || 'Unable to update status');
-    }
-}
-
-export async function cancelOrder(orderId: string): Promise<void> {
-    try {
-        await databases.updateDocument(
-            appwriteConfig.databaseId,
-            ORDERS_COLLECTION_ID,
-            orderId,
-            {
-                order_status: 'cancelled',
-                payment_status: 'cancelled',
-            }
-        );
-        
-        console.log('✅ Order cancelled');
-    } catch (error: any) {
-        console.error('❌ Cancel order error:', error);
-        throw new Error(error.message || 'Unable to cancel order');
-    }
-}
-
-export async function getOrdersByStatus(
-    userId: string,
-    status: string
-): Promise<Order[]> {
-    try {
-        const orders = await databases.listDocuments(
-            appwriteConfig.databaseId,
-            ORDERS_COLLECTION_ID,
-            [
-                Query.equal('user', userId),
-                Query.equal('order_status', status),
-                Query.orderDesc('$createdAt'),
-            ]
-        );
-        
-        return orders.documents as Order[];
-    } catch (error: any) {
-        console.error('❌ Get orders by status error:', error);
-        return [];
+        throw new Error(error.message || 'Không thể cập nhật thanh toán');
     }
 }

@@ -16,6 +16,7 @@ import CardPaymentModal from '@/components/CardPaymentModal';
 import { createOrder, updatePaymentStatus } from '@/lib/payment';
 import useAuthStore from '@/store/auth.store';
 import { router } from 'expo-router';
+import { createQRPayment, pollPaymentStatus } from '@/lib/payment';
 
 const PaymentInfoStripe = ({ 
     label, 

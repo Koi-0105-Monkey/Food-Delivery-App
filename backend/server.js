@@ -1,14 +1,13 @@
-// server.js - COMPLETE FIXED VERSION
+// backend/server.js - SEPAY WEBHOOK (Momo + Agribank)
 
 const express = require('express');
-const crypto = require('crypto');
 const { Client, Databases, Query } = require('node-appwrite');
 const app = express();
 
-// ✅ CRITICAL: Parse JSON body
+// ✅ Parse JSON body
 app.use(express.json());
 
-// ✅ CORS for development
+// ✅ CORS
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -21,14 +20,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// ✅ Momo Production - Static QR không cần credentials
-// Webhook sẽ nhận data từ Momo khi user chuyển tiền
-const MOMO_CONFIG = {
-    partnerCode: 'MOMOEWN820251130', // Production
-    storeName: 'AKESHOP',
-    phoneNumber: '0896494752',
-};
-
 // ✅ Appwrite Config
 const APPWRITE_CONFIG = {
     endpoint: 'https://nyc.cloud.appwrite.io/v1',
@@ -39,133 +30,146 @@ const APPWRITE_CONFIG = {
 };
 
 /**
- * Health check endpoint
+ * Health check
  */
 app.get('/', (req, res) => {
     res.json({
         status: 'OK',
-        message: 'Momo Webhook Server Running',
+        message: 'Webhook Server - Sepay (Momo + Agribank)',
         timestamp: new Date().toISOString(),
-        env: process.env.NODE_ENV || 'development'
     });
 });
 
 /**
- * ✅ WEBHOOK ENDPOINT - Momo calls when user transfers money
+ * ✅ SEPAY WEBHOOK
+ * 
+ * Sepay.vn gửi webhook khi có giao dịch mới
+ * Đăng ký tại: https://my.sepay.vn
+ * 
+ * Webhook format:
+ * {
+ *   "id": 1234567,
+ *   "gateway": "MOMO", // hoặc "ACB" (Agribank)
+ *   "transactionDate": "2025-01-01 12:00:00",
+ *   "accountNumber": "0896494752",
+ *   "code": "ABC123",
+ *   "content": "DHORD1234567890",
+ *   "transferType": "in",
+ *   "transferAmount": 50000,
+ *   "accumulated": 1000000,
+ *   "subAccount": null,
+ *   "description": "Nhận tiền từ ..."
+ * }
  */
-app.post('/api/momo-webhook', async (req, res) => {
+app.post('/api/sepay-webhook', async (req, res) => {
     try {
-        console.log('📥 ========== WEBHOOK RECEIVED ==========');
+        console.log('📥 ========== SEPAY WEBHOOK ==========');
         console.log('Full Body:', JSON.stringify(req.body, null, 2));
-        console.log('Headers:', JSON.stringify(req.headers, null, 2));
 
         const {
-            partnerCode,
-            amount,
-            comment, // ← Nội dung chuyển khoản
-            desc, // ← Alternative field
-            transId,
-            momoTransId,
-            phone,
+            gateway,          // MOMO hoặc ACB (Agribank)
+            content,          // Nội dung chuyển khoản
+            transferAmount,   // Số tiền
+            code,            // Transaction code
+            transactionDate, // Thời gian
         } = req.body;
 
-        // Extract comment from either field
-        const transferNote = comment || desc || '';
+        console.log('🏦 Gateway:', gateway);
+        console.log('💰 Amount:', transferAmount);
+        console.log('📝 Content:', content);
 
-        console.log('💰 Amount:', amount);
-        console.log('📝 Transfer note:', transferNote);
-
-        // ❌ Check missing fields
-        if (!amount || !transId) {
+        // ❌ Validate
+        if (!transferAmount || !content || !code) {
             console.error('❌ Missing required fields');
             return res.status(400).json({
-                message: 'Missing required fields',
-                resultCode: 1
+                success: false,
+                message: 'Missing required fields'
             });
         }
 
-        // ✅ Extract order number (try multiple patterns)
+        // ✅ Extract order number
+        // Format: "DHORD1234567890" hoặc "DH ORD1234567890"
         let orderNumber = null;
         
-        // Pattern 1: ORD123456789
-        const match1 = transferNote.match(/ORD\d+/i);
-        if (match1) orderNumber = match1[0].toUpperCase();
+        // Pattern 1: DHORD123...
+        const match1 = content.match(/DHORD\d+/i);
+        if (match1) orderNumber = match1[0].replace(/^DH/i, '').toUpperCase();
         
-        // Pattern 2: Order ORD123456789
+        // Pattern 2: DH ORD123...
         if (!orderNumber) {
-            const match2 = transferNote.match(/Order\s+(ORD\d+)/i);
-            if (match2) orderNumber = match2[1].toUpperCase();
+            const match2 = content.match(/DH\s*ORD\d+/i);
+            if (match2) orderNumber = match2[0].replace(/^DH\s*/i, '').toUpperCase();
         }
         
-        // Pattern 3: Just numbers after "Order"
+        // Pattern 3: Chỉ có ORD123...
         if (!orderNumber) {
-            const match3 = transferNote.match(/Order\s+(\d+)/i);
-            if (match3) orderNumber = `ORD${match3[1]}`;
+            const match3 = content.match(/ORD\d+/i);
+            if (match3) orderNumber = match3[0].toUpperCase();
         }
 
         console.log('🔍 Extracted order number:', orderNumber);
 
         if (!orderNumber) {
-            console.error('❌ Order number not found in comment:', transferNote);
+            console.error('❌ Order number not found in content:', content);
             return res.status(400).json({
-                message: 'Order number not found in transfer note',
-                resultCode: 1
+                success: false,
+                message: 'Order number not found'
             });
         }
 
-        // ✅ Find order in Appwrite
+        // ✅ Find order
         const order = await findOrderByNumber(orderNumber);
 
         if (!order) {
             console.error('❌ Order not found:', orderNumber);
             return res.status(404).json({
-                message: 'Order not found',
-                resultCode: 1
+                success: false,
+                message: 'Order not found'
             });
         }
 
         console.log('📦 Order found:', order.$id);
         console.log('💵 Expected amount:', order.total);
-        console.log('💵 Received amount:', amount);
+        console.log('💵 Received amount:', transferAmount);
 
-        // ✅ Compare amounts
-        if (amount >= order.total) {
-            // SUCCESS - Amount matches or exceeds
+        // ✅ Check amount
+        if (transferAmount >= order.total) {
+            // SUCCESS
             await updateOrderPaymentStatus(
                 order.$id, 
-                transId, 
+                code, 
                 'paid',
-                amount
+                transferAmount
             );
 
             console.log('✅ Payment confirmed!');
 
             return res.status(200).json({
-                message: 'OK',
-                resultCode: 0,
+                success: true,
+                message: 'Payment confirmed',
             });
         } else {
-            // FAILED - Insufficient amount
+            // FAILED - Insufficient
             console.error('❌ Insufficient amount');
             
             await updateOrderPaymentStatus(
                 order.$id, 
-                transId, 
+                code, 
                 'failed',
-                amount
+                transferAmount
             );
 
             return res.status(200).json({
-                message: 'Insufficient amount',
-                resultCode: 1
+                success: false,
+                message: 'Insufficient amount'
             });
         }
 
     } catch (error) {
         console.error('❌ Webhook error:', error);
         return res.status(500).json({
-            message: 'Internal server error',
-            resultCode: 1
+            success: false,
+            message: 'Internal server error'
         });
     }
 });
@@ -175,11 +179,6 @@ app.post('/api/momo-webhook', async (req, res) => {
  */
 async function findOrderByNumber(orderNumber) {
     try {
-        if (!APPWRITE_CONFIG.apiKey) {
-            console.error('❌ APPWRITE_API_KEY not set!');
-            return null;
-        }
-
         const client = new Client()
             .setEndpoint(APPWRITE_CONFIG.endpoint)
             .setProject(APPWRITE_CONFIG.projectId)
@@ -206,15 +205,10 @@ async function findOrderByNumber(orderNumber) {
 }
 
 /**
- * Update order payment status in Appwrite
+ * Update order payment status
  */
 async function updateOrderPaymentStatus(orderId, transId, status, receivedAmount = 0) {
     try {
-        if (!APPWRITE_CONFIG.apiKey) {
-            console.error('❌ APPWRITE_API_KEY not set!');
-            return false;
-        }
-
         const client = new Client()
             .setEndpoint(APPWRITE_CONFIG.endpoint)
             .setProject(APPWRITE_CONFIG.projectId)
@@ -244,14 +238,17 @@ async function updateOrderPaymentStatus(orderId, transId, status, receivedAmount
     }
 }
 
-// ✅ Start server (for local testing)
-if (process.env.NODE_ENV !== 'production') {
-    const PORT = process.env.PORT || 3000;
-    app.listen(PORT, () => {
-        console.log(`🚀 Server running on http://localhost:${PORT}`);
-        console.log(`📡 Webhook: http://localhost:${PORT}/api/momo-webhook`);
-    });
-}
+// ✅ Start server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📡 Sepay Webhook: http://localhost:${PORT}/api/sepay-webhook`);
+    console.log(`\n⚙️  Setup guide:`);
+    console.log(`   1. Go to https://my.sepay.vn`);
+    console.log(`   2. Register & connect Momo + Agribank`);
+    console.log(`   3. Add webhook URL: http://localhost:${PORT}/api/sepay-webhook`);
+    console.log(`   4. Use ngrok for public URL (local testing)`);
+});
 
-// ✅ Export for Vercel serverless
+// ✅ Export for Vercel
 module.exports = app;
