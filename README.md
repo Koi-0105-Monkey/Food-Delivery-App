@@ -75,6 +75,8 @@ npx expo install expo-haptics
 npm install crypto-js
 npm install --save-dev @types/crypto-js
 npm install express
+npm install qrcode
+npm install vietqr
 ```
 
 **Set Up Environment Variables**
