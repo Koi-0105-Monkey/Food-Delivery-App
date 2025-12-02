@@ -1,4 +1,4 @@
-// backend/server.js - SEPAY WEBHOOK (Momo + Agribank)
+// backend/server.js - SEPAY BIDV WEBHOOK
 
 const express = require('express');
 const { Client, Databases, Query } = require('node-appwrite');
@@ -35,13 +35,13 @@ const APPWRITE_CONFIG = {
 app.get('/', (req, res) => {
     res.json({
         status: 'OK',
-        message: 'Webhook Server - Sepay (Momo + Agribank)',
+        message: 'Webhook Server - Sepay BIDV',
         timestamp: new Date().toISOString(),
     });
 });
 
 /**
- * ✅ SEPAY WEBHOOK
+ * ✅ SEPAY WEBHOOK - BIDV
  * 
  * Sepay.vn gửi webhook khi có giao dịch mới
  * Đăng ký tại: https://my.sepay.vn
@@ -49,11 +49,11 @@ app.get('/', (req, res) => {
  * Webhook format:
  * {
  *   "id": 1234567,
- *   "gateway": "MOMO", // hoặc "ACB" (Agribank)
+ *   "gateway": "BIDV",
  *   "transactionDate": "2025-01-01 12:00:00",
- *   "accountNumber": "0896494752",
+ *   "accountNumber": "96247C3FS8",
  *   "code": "ABC123",
- *   "content": "DHORD1234567890",
+ *   "content": "DH ORD1234567890",
  *   "transferType": "in",
  *   "transferAmount": 50000,
  *   "accumulated": 1000000,
@@ -63,20 +63,22 @@ app.get('/', (req, res) => {
  */
 app.post('/api/sepay-webhook', async (req, res) => {
     try {
-        console.log('📥 ========== SEPAY WEBHOOK ==========');
+        console.log('📥 ========== SEPAY WEBHOOK (BIDV) ==========');
         console.log('Full Body:', JSON.stringify(req.body, null, 2));
 
         const {
-            gateway,          // MOMO hoặc ACB (Agribank)
+            gateway,          // BIDV
             content,          // Nội dung chuyển khoản
             transferAmount,   // Số tiền
             code,            // Transaction code
             transactionDate, // Thời gian
+            accountNumber,   // Số TK nhận tiền
         } = req.body;
 
         console.log('🏦 Gateway:', gateway);
         console.log('💰 Amount:', transferAmount);
         console.log('📝 Content:', content);
+        console.log('🔢 Account:', accountNumber);
 
         // ❌ Validate
         if (!transferAmount || !content || !code) {
@@ -87,24 +89,27 @@ app.post('/api/sepay-webhook', async (req, res) => {
             });
         }
 
+        // ✅ Verify đúng tài khoản BIDV
+        if (accountNumber !== '96247C3FS8') {
+            console.error('❌ Wrong account number:', accountNumber);
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid account number'
+            });
+        }
+
         // ✅ Extract order number
-        // Format: "DHORD1234567890" hoặc "DH ORD1234567890"
+        // Format: "DH ORD1234567890" hoặc "ORD1234567890"
         let orderNumber = null;
         
-        // Pattern 1: DHORD123...
-        const match1 = content.match(/DHORD\d+/i);
-        if (match1) orderNumber = match1[0].replace(/^DH/i, '').toUpperCase();
+        // Pattern 1: DH ORD123...
+        const match1 = content.match(/DH\s*ORD\d+/i);
+        if (match1) orderNumber = match1[0].replace(/^DH\s*/i, '').toUpperCase();
         
-        // Pattern 2: DH ORD123...
+        // Pattern 2: Chỉ có ORD123...
         if (!orderNumber) {
-            const match2 = content.match(/DH\s*ORD\d+/i);
-            if (match2) orderNumber = match2[0].replace(/^DH\s*/i, '').toUpperCase();
-        }
-        
-        // Pattern 3: Chỉ có ORD123...
-        if (!orderNumber) {
-            const match3 = content.match(/ORD\d+/i);
-            if (match3) orderNumber = match3[0].toUpperCase();
+            const match2 = content.match(/ORD\d+/i);
+            if (match2) orderNumber = match2[0].toUpperCase();
         }
 
         console.log('🔍 Extracted order number:', orderNumber);
@@ -245,9 +250,10 @@ app.listen(PORT, () => {
     console.log(`📡 Sepay Webhook: http://localhost:${PORT}/api/sepay-webhook`);
     console.log(`\n⚙️  Setup guide:`);
     console.log(`   1. Go to https://my.sepay.vn`);
-    console.log(`   2. Register & connect Momo + Agribank`);
-    console.log(`   3. Add webhook URL: http://localhost:${PORT}/api/sepay-webhook`);
+    console.log(`   2. Vào Settings → Webhook`);
+    console.log(`   3. Add webhook URL: http://YOUR_PUBLIC_URL/api/sepay-webhook`);
     console.log(`   4. Use ngrok for public URL (local testing)`);
+    console.log(`\n   💡 Ngrok command: npx ngrok http 3000`);
 });
 
 // ✅ Export for Vercel

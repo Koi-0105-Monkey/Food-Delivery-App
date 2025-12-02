@@ -77,6 +77,7 @@ npm install --save-dev @types/crypto-js
 npm install express
 npm install qrcode
 npm install vietqr
+npm install express node-appwrite
 ```
 
 **Set Up Environment Variables**
@@ -115,6 +116,8 @@ NODE_ENV=development
 ```
 
 **Running the Project**
+node backend/server.js
+npx ngrok http 3000
 
 ```bash
 npx expo start
@@ -123,3 +126,23 @@ or
 ```bash
 npm start
 ```
+
+
+1. Đăng ký tài khoản ngrok (miễn phí)
+Truy cập:
+👉 https://dashboard.ngrok.com/signup
+Đăng ký bằng email hoặc GitHub/Google đều được.
+Nhớ xác nhận email — nếu chưa verify, authtoken sẽ không hoạt động → y chang lỗi bạn gặp.
+2. Lấy authtoken
+Sau khi đăng nhập → vào trang:
+👉 https://dashboard.ngrok.com/get-started/your-authtoken
+Bạn sẽ thấy 1 dòng giống:
+ngrok config add-authtoken <TOKEN_CỦA_BẠN>
+3. Dán token vào máy
+Trên terminal:
+ngrok config add-authtoken <TOKEN>
+hoặc nếu bạn chưa cài ngrok:
+npm install -g ngrok
+ngrok config add-authtoken <TOKEN>
+4. Chạy lại
+ngrok http 3000
