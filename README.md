@@ -1,25 +1,4 @@
-<div align="center">
-  <br />
-    <a href="https://www.youtube.com/watch?v=LKrX390fJMw" target="_blank">
-      <img src="assets/readme/hero.png" alt="Project Banner">
-    </a>
-  <br />
-
-  <div>
-    <img src="https://img.shields.io/badge/-React_Native-black?style=for-the-badge&logoColor=white&logo=react&color=61DAFB" alt="React Native" />
-    <img src="https://img.shields.io/badge/-Expo-black?style=for-the-badge&logoColor=white&logo=expo&color=000020" alt="Expo" />
-        <img src="https://img.shields.io/badge/-Appwrite-black?style=for-the-badge&logoColor=white&logo=appwrite&color=F02E65" alt="Appwrite" />
-    <img src="https://img.shields.io/badge/-Tailwind-black?style=for-the-badge&logoColor=white&logo=tailwindcss&color=06B6D4" alt="Tailwind" />
-    <img src="https://img.shields.io/badge/-TypeScript-black?style=for-the-badge&logoColor=white&logo=typescript&color=3178C6" alt="TypeScript" />
-  </div>
-
-  <h3 align="center">Food Delivery Mobile App</h3>
-
-   <div align="center">
-     Build this project step by step with our detailed tutorial on <a href="https://www.youtube.com/@javascriptmastery/videos" target="_blank"><b>JavaScript Mastery</b></a> YouTube. Join the JSM family!
-    </div>
-</div>
-
+<h3 align="center">Food Delivery Mobile App</h3>
 ## 📋 <a name="table">Table of Contents</a>
 
 1. 🤖 [Introduction](#introduction)
@@ -29,21 +8,9 @@
 5. 🔗 [Assets](#links)
 6. 🚀 [More](#more)
 
-## 🚨 Tutorial
-
-This repository contains the code corresponding to an in-depth tutorial available on our YouTube channel, <a href="https://www.youtube.com/@javascriptmastery/videos" target="_blank"><b>JavaScript Mastery</b></a>.
-
-If you prefer visual learning, this is the perfect resource for you. Follow our tutorial to learn how to build projects like these step-by-step in a beginner-friendly manner!
-
-<a href="https://www.youtube.com/watch?v=LKrX390fJMw" target="_blank"><img src="https://github.com/sujatagunale/EasyRead/assets/151519281/1736fca5-a031-4854-8c09-bc110e3bc16d" /></a>
-
 ## <a name="introduction">🤖 Introduction</a>
 
 Built with React Native, TypeScript, and Tailwind CSS, this full-stack Food Delivery app features Google Authentication, dynamic search and filters, cart functionality, and smooth navigation. Powered by Appwrite for backend, database, and file storage, it delivers a responsive, scalable, and intuitive user experience with modern UI/UX best practices.
-
-If you're getting started and need assistance or face any bugs, join our active Discord community with over **50k+** members. It's a place where people help each other out.
-
-<a href="https://discord.com/invite/n6EdbFJ" target="_blank"><img src="https://github.com/sujatagunale/EasyRead/assets/151519281/618f4872-1e10-42da-8213-1d69e486d02e" /></a>
 
 ## <a name="tech-stack">⚙️ Tech Stack</a>
 
@@ -89,19 +56,11 @@ and many more, including code architecture and reusability.
 
 Follow these steps to set up the project locally on your machine.
 
-**Prerequisites**
-
-Make sure you have the following installed on your machine:
-
-- **[Git](https://git-scm.com/)**
-- **[Node.js](https://nodejs.org/en)**
-- **[npm](https://www.npmjs.com/)** _(Node Package Manager)_
-
 **Cloning the Repository**
 
 ```bash
-git clone https://github.com/adrianhajdin/food_ordering.git
-cd food_ordering
+git clone https://github.com/Koi-0105-Monkey/Food-Delivery-App.git
+cd Food-Delivery-App
 ```
 
 **Installation**
@@ -110,6 +69,12 @@ Install the project dependencies using npm:
 
 ```bash
 npm install
+npx expo install expo-image-picker
+npx expo install react-native-webview
+npx expo install expo-haptics
+npm install crypto-js
+npm install --save-dev @types/crypto-js
+npm install express
 ```
 
 **Set Up Environment Variables**
@@ -117,98 +82,42 @@ npm install
 Create a new file named `.env` in the root of your project and add the following content:
 
 ```env
+# ========== APPWRITE CONFIGURATION ==========
+# Appwrite Project Settings
 EXPO_PUBLIC_APPWRITE_PROJECT_ID=
 EXPO_PUBLIC_APPWRITE_ENDPOINT=
-```
+EXPO_PUBLIC_APPWRITE_PLATFORM=
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=
 
-Replace the placeholder values with your actual credentials by signing up on the **[Appwrite](https://jsm.dev/rn25-appwrite)** dashboard.
+# Appwrite Database IDs
+EXPO_PUBLIC_APPWRITE_DATABASE_ID=
+EXPO_PUBLIC_APPWRITE_BUCKET_ID=
+
+# Appwrite Collection IDs
+EXPO_PUBLIC_APPWRITE_USERS_COLLECTION_ID=
+EXPO_PUBLIC_APPWRITE_CATEGORIES_COLLECTION_ID=
+EXPO_PUBLIC_APPWRITE_MENU_COLLECTION_ID=
+EXPO_PUBLIC_APPWRITE_CUSTOMIZATIONS_COLLECTION_ID=
+EXPO_PUBLIC_APPWRITE_MENU_CUSTOMIZATIONS_COLLECTION_ID=
+EXPO_PUBLIC_APPWRITE_USER_ADDRESSES_COLLECTION_ID=
+EXPO_PUBLIC_APPWRITE_CART_ITEMS_COLLECTION_ID=
+EXPO_PUBLIC_APPWRITE_ORDERS_COLLECTION_ID=
+
+# ========== APPWRITE SERVER-SIDE (for seed.js) ==========
+APPWRITE_API_KEY=
+APPWRITE_SERVER_ENDPOINT=
+
+DEBUG_MODE=false
+PORT=3000
+NODE_ENV=development
+```
 
 **Running the Project**
 
 ```bash
 npx expo start
 ```
-
-Open your ExpoGO app on your phone and scan the QR code to view the project.
-
-## <a name="links">🔗 Assets</a>
-
-Assets and snippets used in the project can be found in the **[video kit](https://jsmastery.com/video-kit/d6633345-8797-4b96-8a4b-935618306d1d)**.
-
-<a href="https://jsmastery.com/video-kit/d6633345-8797-4b96-8a4b-935618306d1d" target="_blank">
-  <img src="assets/readme/videokit.png" alt="Video Kit Banner">
-</a>
-
-## <a name="more">🚀 More</a>
-
-**Advance your skills with Next.js Pro Course**
-
-Enjoyed creating this project? Dive deeper into our PRO courses for a richer learning adventure. They're packed with
-
-detailed explanations, cool features, and exercises to boost your skills. Give it a go!
-
-<a href="https://jsm.dev/rn-food-jsm" target="_blank">
-   <img src="assets/readme/jsmpro.png" alt="Project Banner">
-</a>
-
-
-
-branch : feature/edit-profile
- add in terminal : npx expo install expo-image-picker
-
- 🔑 Cách lấy Google Maps API Key:
-Bước 1: Truy cập Google Cloud Console
-
-Vào https://console.cloud.google.com/
-Đăng nhập tài khoản Google
-
-Bước 2: Tạo Project
-
-Click "Select a project" → "New Project"
-Tên project: Food Delivery App
-Click "Create"
-
-Bước 3: Enable APIs
-
-Vào APIs & Services → Library
-Search và Enable các APIs sau:
-
-✅ Maps JavaScript API
-✅ Maps Embed API
-✅ Geocoding API
-✅ Places API
-
-
-
-Bước 4: Tạo API Key
-
-Vào APIs & Services → Credentials
-Click Create Credentials → API Key
-Copy API Key (dạng: AIzaSyC...)
-(Recommended) Click Restrict Key:
-
-Application restrictions: None (hoặc Android/iOS apps)
-API restrictions: Chọn các APIs đã enable ở trên
-
-
-
-Bước 5: Thêm vào .env
-envEXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyC...
-cài thêm 
-npx expo install react-native-webview
-ở nhánh feature/signin
-
-+ ở nhánh feature/edit-profile
-Appwwrite: thêm collum phone 
-nhập lệnh terminal: npx expo install expo-image-picker
-
-+ở nhánh feature/product-detail
-nhập lệnh terminal: npx expo install expo-haptics
-
-+ ở nhánh feature/cart_items
-sửa bảng menu_id (cái bảng có relationship) thành menu_id - string - required - 255
-
-
-npm install crypto-js
-npm install --save-dev @types/crypto-js
-npm install express
+or
+```bash
+npm start
+```
