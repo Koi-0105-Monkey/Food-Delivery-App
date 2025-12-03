@@ -147,3 +147,6 @@ npm install -g ngrok
 ngrok config add-authtoken <TOKEN>
 4. Chạy lại
 ngrok http 3000
+
+Link figma:
+https://www.figma.com/design/FIe3i6vwpWeUOvVwno7ua3/Food-Delivery-App?node-id=0-1&p=f
