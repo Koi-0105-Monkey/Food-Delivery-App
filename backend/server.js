@@ -1,4 +1,4 @@
-// backend/server.js - SEPAY BIDV WEBHOOK
+// backend/server.js - FIXED VERSION WITH PROPER API KEY
 
 const express = require('express');
 const { Client, Databases, Query } = require('node-appwrite');
@@ -26,7 +26,9 @@ const APPWRITE_CONFIG = {
     projectId: '69230ad2001fb8f2aee4',
     databaseId: '68629ae60038a7c61fe4',
     ordersCollectionId: 'orders',
-    apiKey: process.env.APPWRITE_API_KEY || 'standard_c9f94d4e2c13a8df7325ae8914bdb6c4f17d92af7461d2bae9e4cc0bdac9395bbabfd5b87f9ab9eb596c1ea9cac286442d954c5fec5eb795f47879bce69539ed12224544b1d5f50d597536a8a06c50df0bddbd91f6c8b0aca3739eb2b2131fd89bf1b7bc86585cdd52c161e22cb602278e5d45d7b87ebbdfdee3be3b8d1df7a1',
+    // 🔥 IMPORTANT: THAY BẰNG API KEY MỚI TỪ APPWRITE CONSOLE
+    // Tạo API key với scopes: databases.read + databases.write
+    apiKey: process.env.APPWRITE_API_KEY || 'YOUR_NEW_API_KEY_HERE',
 };
 
 /**
@@ -42,24 +44,6 @@ app.get('/', (req, res) => {
 
 /**
  * ✅ SEPAY WEBHOOK - BIDV
- * 
- * Sepay.vn gửi webhook khi có giao dịch mới
- * Đăng ký tại: https://my.sepay.vn
- * 
- * Webhook format:
- * {
- *   "id": 1234567,
- *   "gateway": "BIDV",
- *   "transactionDate": "2025-01-01 12:00:00",
- *   "accountNumber": "96247C3FS8",
- *   "code": "ABC123",
- *   "content": "DH ORD1234567890",
- *   "transferType": "in",
- *   "transferAmount": 50000,
- *   "accumulated": 1000000,
- *   "subAccount": null,
- *   "description": "Nhận tiền từ ..."
- * }
  */
 app.post('/api/sepay-webhook', async (req, res) => {
     try {
@@ -67,21 +51,23 @@ app.post('/api/sepay-webhook', async (req, res) => {
         console.log('Full Body:', JSON.stringify(req.body, null, 2));
 
         const {
-            gateway,          // BIDV
-            content,          // Nội dung chuyển khoản
-            transferAmount,   // Số tiền
-            code,            // Transaction code
-            transactionDate, // Thời gian
-            accountNumber,   // Số TK nhận tiền
+            gateway,
+            content,
+            description,
+            transferAmount,
+            code,
+            transactionDate,
+            accountNumber,
         } = req.body;
 
         console.log('🏦 Gateway:', gateway);
         console.log('💰 Amount:', transferAmount);
         console.log('📝 Content:', content);
-        console.log('🔢 Account:', accountNumber);
+        console.log('📝 Description:', description);
+        console.log('🔢 Sender Account:', accountNumber);
 
-        // ❌ Validate
-        if (!transferAmount || !content || !code) {
+        // 🔥 FIX: Validate với dữ liệu thực tế
+        if (!transferAmount || !content) {
             console.error('❌ Missing required fields');
             return res.status(400).json({
                 success: false,
@@ -89,27 +75,60 @@ app.post('/api/sepay-webhook', async (req, res) => {
             });
         }
 
-        // ✅ Verify đúng tài khoản BIDV
-        if (accountNumber !== '96247C3FS8') {
-            console.error('❌ Wrong account number:', accountNumber);
+        // 🔥 FIX: Extract receiver account từ content hoặc description
+        // Format: "BIDV;96247C3FS8;DH ORD1764768833721631"
+        let receiverAccount = null;
+
+        // ✅ FIXED REGEX: Chấp nhận cả chữ và số (alphanumeric)
+        // Try content first
+        const contentMatch = content.match(/BIDV;([A-Z0-9]+);/i);
+        if (contentMatch) {
+            receiverAccount = contentMatch[1];
+        }
+
+        // If not found, try description
+        if (!receiverAccount && description) {
+            const descMatch = description.match(/BIDV;([A-Z0-9]+);/i);
+            if (descMatch) {
+                receiverAccount = descMatch[1];
+            }
+        }
+
+        console.log('🔍 Extracted receiver account:', receiverAccount);
+
+        // ✅ Verify receiver account
+        if (receiverAccount !== '96247C3FS8') {
+            console.error('❌ Wrong receiver account:', receiverAccount);
             return res.status(400).json({
                 success: false,
-                message: 'Invalid account number'
+                message: 'Invalid receiver account'
             });
         }
 
         // ✅ Extract order number
-        // Format: "DH ORD1234567890" hoặc "ORD1234567890"
         let orderNumber = null;
-        
-        // Pattern 1: DH ORD123...
-        const match1 = content.match(/DH\s*ORD\d+/i);
-        if (match1) orderNumber = match1[0].replace(/^DH\s*/i, '').toUpperCase();
-        
-        // Pattern 2: Chỉ có ORD123...
+
+        // 🔥 FIX: Format từ Sepay: "BIDV;96247C3FS8;DH ORD1764768833721631"
+        // Try content first
+        const contentOrderMatch = content.match(/DH\s*ORD\d+/i);
+        if (contentOrderMatch) {
+            orderNumber = contentOrderMatch[0].replace(/^DH\s*/i, '').toUpperCase();
+        }
+
+        // If not found in content, try description
+        if (!orderNumber && description) {
+            const descOrderMatch = description.match(/DH\s*ORD\d+/i);
+            if (descOrderMatch) {
+                orderNumber = descOrderMatch[0].replace(/^DH\s*/i, '').toUpperCase();
+            }
+        }
+
+        // If still not found, try direct ORD pattern
         if (!orderNumber) {
-            const match2 = content.match(/ORD\d+/i);
-            if (match2) orderNumber = match2[0].toUpperCase();
+            const directMatch = (content + ' ' + (description || '')).match(/ORD\d+/i);
+            if (directMatch) {
+                orderNumber = directMatch[0].toUpperCase();
+            }
         }
 
         console.log('🔍 Extracted order number:', orderNumber);
@@ -141,8 +160,8 @@ app.post('/api/sepay-webhook', async (req, res) => {
         if (transferAmount >= order.total) {
             // SUCCESS
             await updateOrderPaymentStatus(
-                order.$id, 
-                code, 
+                order.$id,
+                code,
                 'paid',
                 transferAmount
             );
@@ -156,10 +175,10 @@ app.post('/api/sepay-webhook', async (req, res) => {
         } else {
             // FAILED - Insufficient
             console.error('❌ Insufficient amount');
-            
+
             await updateOrderPaymentStatus(
-                order.$id, 
-                code, 
+                order.$id,
+                code,
                 'failed',
                 transferAmount
             );
@@ -180,7 +199,7 @@ app.post('/api/sepay-webhook', async (req, res) => {
 });
 
 /**
- * Find order by order_number
+ * 🔥 FIXED: Find order by order_number (NOT $id)
  */
 async function findOrderByNumber(orderNumber) {
     try {
@@ -191,11 +210,18 @@ async function findOrderByNumber(orderNumber) {
 
         const databases = new Databases(client);
 
+        console.log('🔍 Searching for order:', orderNumber);
+        console.log('📂 Database:', APPWRITE_CONFIG.databaseId);
+        console.log('📂 Collection:', APPWRITE_CONFIG.ordersCollectionId);
+
+        // 🔥 FIX: Query bằng order_number, không phải $id
         const orders = await databases.listDocuments(
             APPWRITE_CONFIG.databaseId,
             APPWRITE_CONFIG.ordersCollectionId,
             [Query.equal('order_number', orderNumber)]
         );
+
+        console.log('📊 Query result:', orders.total, 'orders found');
 
         if (orders.documents.length === 0) {
             return null;
@@ -205,6 +231,7 @@ async function findOrderByNumber(orderNumber) {
 
     } catch (error) {
         console.error('❌ Find order error:', error.message);
+        console.error('Full error:', error);
         return null;
     }
 }
@@ -256,5 +283,4 @@ app.listen(PORT, () => {
     console.log(`\n   💡 Ngrok command: npx ngrok http 3000`);
 });
 
-// ✅ Export for Vercel
 module.exports = app;
