@@ -1,9 +1,9 @@
-// lib/payment.ts - SIMPLE QR PAYMENT
+// lib/payment.ts - BIDV PAYMENT VIA SEPAY
 
 import { ID, Query } from 'react-native-appwrite';
 import { appwriteConfig, databases } from './appwrite';
 import { CreateOrderParams, Order } from '@/type';
-import { generatePaymentQR } from './vietqr-payment';
+import { generateSepayBIDVQR } from './sepay-bidv';
 
 const ORDERS_COLLECTION_ID = process.env.EXPO_PUBLIC_APPWRITE_ORDERS_COLLECTION_ID!;
 
@@ -17,15 +17,14 @@ function generateOrderNumber(): string {
 }
 
 /**
- * ✅ TẠO QR PAYMENT - Trả về cả Momo và Agribank QR
+ * ✅ TẠO QR PAYMENT - BIDV qua Sepay
  */
 export async function createQRPayment(
     orderNumber: string, 
     amount: number
 ): Promise<{
     success: boolean;
-    momo?: any;
-    agribank?: any;
+    bidv?: any;
     message?: string;
     orderId?: string;
 }> {
@@ -37,20 +36,18 @@ export async function createQRPayment(
             };
         }
 
-        console.log('✅ Tạo QR Payment');
+        console.log('✅ Tạo QR Payment BIDV');
         console.log('💰 Số tiền:', amount.toLocaleString('vi-VN') + 'đ');
         console.log('📝 Đơn hàng:', orderNumber);
 
-        // Generate QR codes
-        const paymentData = generatePaymentQR(amount, orderNumber);
+        // Generate BIDV QR code
+        const paymentData = generateSepayBIDVQR(amount, orderNumber);
 
-        console.log('📱 Momo QR:', paymentData.momo.qrCodeUrl);
-        console.log('🏦 Agribank QR:', paymentData.agribank.qrCodeUrl);
+        console.log('🏦 BIDV QR:', paymentData.qrCodeUrl);
 
         return {
             success: true,
-            momo: paymentData.momo,
-            agribank: paymentData.agribank,
+            bidv: paymentData,
             orderId: orderNumber,
         };
 
