@@ -47,23 +47,26 @@ export const storage = new Storage(client);
 const avatars = new Avatars(client);
 
 // Helper function to wait for session to be ready
-const waitForSession = (ms: number = 500) => 
+const waitForSession = (ms: number = 1000) => 
     new Promise(resolve => setTimeout(resolve, ms));
 
-// ========== AUTH FUNCTIONS ==========
+// ========== AUTH FUNCTIONS - COMPLETE FIXED VERSION ==========
+
 export const createUser = async ({ email, password, name }: CreateUserParams) => {
     try {
-        // Check if session exists and delete it
+        console.log('🔐 Starting sign up...');
+
+        // 1. Delete existing sessions
         try {
             const sessions = await account.listSessions();
             for (const session of sessions.sessions) {
                 await account.deleteSession(session.$id);
             }
         } catch (e) {
-            // No active session, continue
+            console.log('No existing sessions');
         }
 
-        // Create account
+        // 2. Create account
         const newAccount = await account.create(
             ID.unique(),
             email,
@@ -77,21 +80,21 @@ export const createUser = async ({ email, password, name }: CreateUserParams) =>
 
         console.log('✅ Account created:', newAccount.$id);
 
-        // Sign in the new user
+        // 3. Sign in immediately
         const session = await account.createEmailPasswordSession(email, password);
         console.log('✅ Session created:', session.$id);
 
-        // Wait for session to be fully established
-        await waitForSession();
+        // 4. Wait for session to be active (Android needs more time)
+        await waitForSession(1000);
 
-        // Verify session is active
+        // 5. Verify session
         const currentAccount = await account.get();
         console.log('✅ Account verified:', currentAccount.email);
 
-        // Create avatar
+        // 6. Create avatar
         const avatarUrl = avatars.getInitialsURL(name);
 
-        // Create user document
+        // 7. ✅ FIX: Create user document with explicit permissions
         const userDocument = await databases.createDocument(
             appwriteConfig.databaseId,
             appwriteConfig.userCollectionId,
@@ -101,7 +104,14 @@ export const createUser = async ({ email, password, name }: CreateUserParams) =>
                 name,
                 accountId: newAccount.$id,
                 avatar: avatarUrl.toString(),
-            }
+                phone: '',
+            },
+            [
+                // ✅ CRITICAL: Set permissions explicitly for this user
+                `read("user:${newAccount.$id}")`,
+                `update("user:${newAccount.$id}")`,
+                `delete("user:${newAccount.$id}")`,
+            ]
         );
 
         console.log('✅ User document created:', userDocument.$id);
@@ -111,7 +121,10 @@ export const createUser = async ({ email, password, name }: CreateUserParams) =>
         console.error('❌ Create user error:', error);
 
         if (error.code === 409) {
-            throw new Error('user_already_exists');
+            throw new Error('An account with this email already exists');
+        }
+        if (error.code === 401 || error.message?.includes('authorized')) {
+            throw new Error('Permission error. Please check Appwrite collection permissions.');
         }
         if (error.message?.includes('Invalid email')) {
             throw new Error('Invalid email format');
@@ -126,6 +139,8 @@ export const createUser = async ({ email, password, name }: CreateUserParams) =>
 
 export const signIn = async ({ email, password }: SignInParams) => {
     try {
+        console.log('🔐 Starting sign in...');
+
         // Delete any existing session first
         try {
             const sessions = await account.listSessions();
@@ -133,7 +148,7 @@ export const signIn = async ({ email, password }: SignInParams) => {
                 await account.deleteSession(session.$id);
             }
         } catch (e) {
-            // No active session, continue
+            console.log('No existing sessions');
         }
 
         // Create new session
@@ -146,7 +161,7 @@ export const signIn = async ({ email, password }: SignInParams) => {
         console.log('✅ Session created:', session.$id);
 
         // Wait for session to be fully established
-        await waitForSession();
+        await waitForSession(1000);
 
         // Verify session is active
         const currentAccount = await account.get();
@@ -157,13 +172,13 @@ export const signIn = async ({ email, password }: SignInParams) => {
         console.error('❌ Sign in error:', error);
 
         if (error.code === 401) {
-            throw new Error('Invalid credentials');
+            throw new Error('Invalid email or password');
         }
         if (error.message?.includes('user_not_found')) {
-            throw new Error('user_not_found');
+            throw new Error('No account found with this email');
         }
         if (error.message?.includes('user_blocked')) {
-            throw new Error('user_blocked');
+            throw new Error('Account has been blocked');
         }
 
         throw new Error(error.message || 'Failed to sign in');
@@ -172,7 +187,7 @@ export const signIn = async ({ email, password }: SignInParams) => {
 
 export const getCurrentUser = async () => {
     try {
-        // First verify we have an active session
+        // 1. First verify we have an active session
         const currentAccount = await account.get();
 
         if (!currentAccount) {
@@ -182,7 +197,7 @@ export const getCurrentUser = async () => {
 
         console.log('✅ Account found:', currentAccount.email);
 
-        // Then get user document
+        // 2. ✅ FIX: Query user document by accountId (not $id)
         const currentUser = await databases.listDocuments(
             appwriteConfig.databaseId,
             appwriteConfig.userCollectionId,
@@ -190,8 +205,38 @@ export const getCurrentUser = async () => {
         );
 
         if (!currentUser || currentUser.documents.length === 0) {
-            console.log('❌ User document not found');
-            return null;
+            console.error('❌ User document not found for accountId:', currentAccount.$id);
+            
+            // ✅ FIX: Auto-create missing user document
+            console.log('🔧 Creating missing user document...');
+            
+            const avatarUrl = avatars.getInitialsURL(currentAccount.name);
+            
+            try {
+                const userDocument = await databases.createDocument(
+                    appwriteConfig.databaseId,
+                    appwriteConfig.userCollectionId,
+                    ID.unique(),
+                    {
+                        email: currentAccount.email,
+                        name: currentAccount.name,
+                        accountId: currentAccount.$id,
+                        avatar: avatarUrl.toString(),
+                        phone: '',
+                    },
+                    [
+                        `read("user:${currentAccount.$id}")`,
+                        `update("user:${currentAccount.$id}")`,
+                        `delete("user:${currentAccount.$id}")`,
+                    ]
+                );
+                
+                console.log('✅ User document auto-created:', userDocument.$id);
+                return userDocument;
+            } catch (createError: any) {
+                console.error('❌ Failed to auto-create user document:', createError);
+                return null;
+            }
         }
 
         console.log('✅ User document found:', currentUser.documents[0].email);
@@ -201,6 +246,12 @@ export const getCurrentUser = async () => {
         
         // If session expired or invalid, return null (not an error)
         if (error.code === 401 || error.message?.includes('session') || error.message?.includes('guests')) {
+            return null;
+        }
+
+        // Permission error - collection not readable
+        if (error.message?.includes('authorized')) {
+            console.error('❌ Permission denied: Collection users must have Read permission for role Users');
             return null;
         }
 
@@ -243,114 +294,6 @@ export const getCategories = async () => {
     }
 };
 
-// ========== ADDRESS FUNCTIONS ==========
-
-export const getUserAddress = async (userId: string) => {
-    try {
-        const addresses = await databases.listDocuments(
-            appwriteConfig.databaseId,
-            appwriteConfig.userAddressesCollectionId,
-            [Query.equal('user_id', userId)]
-        );
-
-        if (addresses.documents.length === 0) return null;
-
-        return addresses.documents[0];
-    } catch (error: any) {
-        console.error('❌ Get address error:', error);
-        return null;
-    }
-};
-
-// ========== CART FUNCTIONS ==========
-export const syncCartToServerLegacy = async (userId: string, cartItems: any[]) => {
-    try {
-        // Delete all existing cart items for this user
-        const existing = await databases.listDocuments(
-            appwriteConfig.databaseId,
-            appwriteConfig.cartItemsCollectionId,
-            [Query.equal('user_id', userId)]
-        );
-
-        for (const item of existing.documents) {
-            await databases.deleteDocument(
-                appwriteConfig.databaseId,
-                appwriteConfig.cartItemsCollectionId,
-                item.$id
-            );
-        }
-
-        // Create new cart items
-        const promises = cartItems.map((item) =>
-            databases.createDocument(
-                appwriteConfig.databaseId,
-                appwriteConfig.cartItemsCollectionId,
-                ID.unique(),
-                {
-                    user_id: userId,
-                    menu_id: item.id,
-                    name: item.name,
-                    price: item.price,
-                    image_url: item.image_url,
-                    quantity: item.quantity,
-                    customizations: JSON.stringify(item.customizations || []),
-                }
-            )
-        );
-
-        await Promise.all(promises);
-        console.log('✅ Cart synced to server');
-    } catch (error: any) {
-        console.error('❌ Sync cart error:', error);
-        throw new Error(error.message || 'Failed to sync cart');
-    }
-};
-
-export const getCartFromServerLegacy = async (userId: string) => {
-    try {
-        const cartItems = await databases.listDocuments(
-            appwriteConfig.databaseId,
-            appwriteConfig.cartItemsCollectionId,
-            [Query.equal('user_id', userId)]
-        );
-
-        // Convert to cart format
-        return cartItems.documents.map((doc: any) => ({
-            id: doc.menu_id,
-            name: doc.name,
-            price: doc.price,
-            image_url: doc.image_url,
-            quantity: doc.quantity,
-            customizations: JSON.parse(doc.customizations || '[]'),
-        }));
-    } catch (error: any) {
-        console.error('❌ Get cart error:', error);
-        return [];
-    }
-};
-
-export const clearCartFromServerLegacy = async (userId: string) => {
-    try {
-        const existing = await databases.listDocuments(
-            appwriteConfig.databaseId,
-            appwriteConfig.cartItemsCollectionId,
-            [Query.equal('user_id', userId)]
-        );
-
-        for (const item of existing.documents) {
-            await databases.deleteDocument(
-                appwriteConfig.databaseId,
-                appwriteConfig.cartItemsCollectionId,
-                item.$id
-            );
-        }
-
-        console.log('✅ Cart cleared from server');
-    } catch (error: any) {
-        console.error('❌ Clear cart error:', error);
-    }
-};
-
 // ========== USER PROFILE FUNCTIONS ==========
 export const updateUserProfile = async ({ 
     userId,
@@ -367,17 +310,15 @@ export const updateUserProfile = async ({
         const userDocId = userId;
         let finalAvatarUrl = avatarUri;
 
-        // 🔥 FIX: If avatar is local file (from image picker), upload to storage
+        // If avatar is local file (from image picker), upload to storage
         if (avatarUri.startsWith('file://')) {
             console.log('📤 Uploading new avatar...');
             
             const response = await fetch(avatarUri);
             const blob = await response.blob();
             
-            // Create unique file ID
             const fileId = ID.unique();
             
-            // Upload file using InputFile
             const file = await storage.createFile(
                 appwriteConfig.bucketId,
                 fileId,
@@ -389,10 +330,9 @@ export const updateUserProfile = async ({
                 }
             );
 
-            // 🔥 FIX: Get proper view URL with project parameter
             finalAvatarUrl = `${appwriteConfig.endpoint}/storage/buckets/${appwriteConfig.bucketId}/files/${file.$id}/view?project=${appwriteConfig.projectId}`;
 
-            console.log('✅ Avatar uploaded successfully:', finalAvatarUrl);
+            console.log('✅ Avatar uploaded successfully');
         }
 
         // Update user document
@@ -417,9 +357,6 @@ export const updateUserProfile = async ({
 
 // ========== ADDRESS FUNCTIONS - MULTI ADDRESS SUPPORT ==========
 
-/**
- * Lấy tất cả địa chỉ của user
- */
 export const getUserAddresses = async (userId: string) => {
     try {
         const addresses = await databases.listDocuments(
@@ -435,154 +372,6 @@ export const getUserAddresses = async (userId: string) => {
     }
 };
 
-/**
- * Tạo unique key cho cart item (menu_id + customizations)
- */
-function getCartItemKey(menuId: string, customizations: any[] = []) {
-    const customIds = customizations
-        .map(c => c.id)
-        .sort()
-        .join(',');
-    return `${menuId}|${customIds}`;
-}
-
-/**
- * Sync giỏ hàng lên server (SMART SYNC - chỉ update thay đổi)
- */
-export const syncCartToServer = async (userId: string, cartItems: any[]) => {
-    try {
-        // Get existing cart from server
-        const existing = await databases.listDocuments(
-            appwriteConfig.databaseId,
-            appwriteConfig.cartItemsCollectionId,
-            [Query.equal('user_id', userId)]
-        );
-
-        // Create map of existing items
-        const existingMap = new Map();
-        for (const doc of existing.documents) {
-            const key = getCartItemKey(doc.menu_id, JSON.parse(doc.customizations || '[]'));
-            existingMap.set(key, doc);
-        }
-
-        // Create map of new items
-        const newMap = new Map();
-        for (const item of cartItems) {
-            const key = getCartItemKey(item.id, item.customizations);
-            newMap.set(key, item);
-        }
-
-        // DELETE items not in cart anymore
-        for (const [key, doc] of existingMap) {
-            if (!newMap.has(key)) {
-                await databases.deleteDocument(
-                    appwriteConfig.databaseId,
-                    appwriteConfig.cartItemsCollectionId,
-                    doc.$id
-                );
-                console.log(`🗑️  Deleted cart item: ${doc.name}`);
-            }
-        }
-
-        // UPDATE or CREATE items
-        for (const [key, item] of newMap) {
-            const existingDoc = existingMap.get(key);
-
-            if (existingDoc) {
-                // UPDATE quantity if changed
-                if (existingDoc.quantity !== item.quantity) {
-                    await databases.updateDocument(
-                        appwriteConfig.databaseId,
-                        appwriteConfig.cartItemsCollectionId,
-                        existingDoc.$id,
-                        {
-                            quantity: item.quantity,
-                            price: item.price,
-                        }
-                    );
-                    console.log(`🔄 Updated ${item.name}: qty ${existingDoc.quantity} → ${item.quantity}`);
-                }
-            } else {
-                // CREATE new item
-                await databases.createDocument(
-                    appwriteConfig.databaseId,
-                    appwriteConfig.cartItemsCollectionId,
-                    ID.unique(),
-                    {
-                        user_id: userId,
-                        menu_id: item.id,
-                        name: item.name,
-                        price: item.price,
-                        image_url: item.image_url,
-                        quantity: item.quantity,
-                        customizations: JSON.stringify(item.customizations || []),
-                    }
-                );
-                console.log(`➕ Added ${item.name} (qty: ${item.quantity})`);
-            }
-        }
-
-        console.log('✅ Cart synced to server');
-    } catch (error: any) {
-        console.error('❌ Sync cart error:', error);
-        throw new Error(error.message || 'Failed to sync cart');
-    }
-};
-
-/**
- * Lấy giỏ hàng từ server
- */
-export const getCartFromServer = async (userId: string) => {
-    try {
-        const cartItems = await databases.listDocuments(
-            appwriteConfig.databaseId,
-            appwriteConfig.cartItemsCollectionId,
-            [Query.equal('user_id', userId)]
-        );
-
-        // Convert to cart format
-        return cartItems.documents.map((doc: any) => ({
-            id: doc.menu_id,
-            name: doc.name,
-            price: doc.price,
-            image_url: doc.image_url,
-            quantity: doc.quantity,
-            customizations: JSON.parse(doc.customizations || '[]'),
-        }));
-    } catch (error: any) {
-        console.error('❌ Get cart error:', error);
-        return [];
-    }
-};
-
-/**
- * Xóa toàn bộ giỏ hàng trên server
- */
-export const clearCartFromServer = async (userId: string) => {
-    try {
-        const existing = await databases.listDocuments(
-            appwriteConfig.databaseId,
-            appwriteConfig.cartItemsCollectionId,
-            [Query.equal('user_id', userId)]
-        );
-
-        for (const item of existing.documents) {
-            await databases.deleteDocument(
-                appwriteConfig.databaseId,
-                appwriteConfig.cartItemsCollectionId,
-                item.$id
-            );
-        }
-
-        console.log('✅ Cart cleared from server');
-    } catch (error: any) {
-        console.error('❌ Clear cart error:', error);
-    }
-};
-
-/**
- * Tạo địa chỉ mới
- */
 export const saveUserAddress = async (userId: string, address: {
     street: string;
     city: string;
@@ -591,11 +380,10 @@ export const saveUserAddress = async (userId: string, address: {
     isDefault?: boolean;
 }) => {
     try {
-        // Nếu là địa chỉ đầu tiên hoặc set là default, unset các địa chỉ default khác
+        // If setting as default, unset all existing defaults
         if (address.isDefault) {
             const existingAddresses = await getUserAddresses(userId);
             
-            // Unset all existing defaults
             for (const addr of existingAddresses) {
                 if (addr.is_default) {
                     await databases.updateDocument(
@@ -630,9 +418,6 @@ export const saveUserAddress = async (userId: string, address: {
     }
 };
 
-/**
- * Cập nhật địa chỉ
- */
 export const updateUserAddress = async (addressId: string, address: {
     street?: string;
     city?: string;
@@ -661,9 +446,6 @@ export const updateUserAddress = async (addressId: string, address: {
     }
 };
 
-/**
- * Xóa địa chỉ
- */
 export const deleteUserAddress = async (addressId: string) => {
     try {
         await databases.deleteDocument(
@@ -679,9 +461,6 @@ export const deleteUserAddress = async (addressId: string) => {
     }
 };
 
-/**
- * Set địa chỉ làm default
- */
 export const setDefaultAddress = async (userId: string, addressId: string) => {
     try {
         // Unset all existing defaults
@@ -710,5 +489,136 @@ export const setDefaultAddress = async (userId: string, addressId: string) => {
     } catch (error: any) {
         console.error('❌ Set default address error:', error);
         throw new Error(error.message || 'Failed to set default address');
+    }
+};
+
+// ========== CART FUNCTIONS ==========
+
+function getCartItemKey(menuId: string, customizations: any[] = []) {
+    const customIds = customizations
+        .map(c => c.id)
+        .sort()
+        .join(',');
+    return `${menuId}|${customIds}`;
+}
+
+export const syncCartToServer = async (userId: string, cartItems: any[]) => {
+    try {
+        // Get existing cart from server
+        const existing = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.cartItemsCollectionId,
+            [Query.equal('user_id', userId)]
+        );
+
+        // Create map of existing items
+        const existingMap = new Map();
+        for (const doc of existing.documents) {
+            const key = getCartItemKey(doc.menu_id, JSON.parse(doc.customizations || '[]'));
+            existingMap.set(key, doc);
+        }
+
+        // Create map of new items
+        const newMap = new Map();
+        for (const item of cartItems) {
+            const key = getCartItemKey(item.id, item.customizations);
+            newMap.set(key, item);
+        }
+
+        // DELETE items not in cart anymore
+        for (const [key, doc] of existingMap) {
+            if (!newMap.has(key)) {
+                await databases.deleteDocument(
+                    appwriteConfig.databaseId,
+                    appwriteConfig.cartItemsCollectionId,
+                    doc.$id
+                );
+            }
+        }
+
+        // UPDATE or CREATE items
+        for (const [key, item] of newMap) {
+            const existingDoc = existingMap.get(key);
+
+            if (existingDoc) {
+                // UPDATE quantity if changed
+                if (existingDoc.quantity !== item.quantity) {
+                    await databases.updateDocument(
+                        appwriteConfig.databaseId,
+                        appwriteConfig.cartItemsCollectionId,
+                        existingDoc.$id,
+                        {
+                            quantity: item.quantity,
+                            price: item.price,
+                        }
+                    );
+                }
+            } else {
+                // CREATE new item
+                await databases.createDocument(
+                    appwriteConfig.databaseId,
+                    appwriteConfig.cartItemsCollectionId,
+                    ID.unique(),
+                    {
+                        user_id: userId,
+                        menu_id: item.id,
+                        name: item.name,
+                        price: item.price,
+                        image_url: item.image_url,
+                        quantity: item.quantity,
+                        customizations: JSON.stringify(item.customizations || []),
+                    }
+                );
+            }
+        }
+
+        console.log('✅ Cart synced to server');
+    } catch (error: any) {
+        console.error('❌ Sync cart error:', error);
+        throw new Error(error.message || 'Failed to sync cart');
+    }
+};
+
+export const getCartFromServer = async (userId: string) => {
+    try {
+        const cartItems = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.cartItemsCollectionId,
+            [Query.equal('user_id', userId)]
+        );
+
+        return cartItems.documents.map((doc: any) => ({
+            id: doc.menu_id,
+            name: doc.name,
+            price: doc.price,
+            image_url: doc.image_url,
+            quantity: doc.quantity,
+            customizations: JSON.parse(doc.customizations || '[]'),
+        }));
+    } catch (error: any) {
+        console.error('❌ Get cart error:', error);
+        return [];
+    }
+};
+
+export const clearCartFromServer = async (userId: string) => {
+    try {
+        const existing = await databases.listDocuments(
+            appwriteConfig.databaseId,
+            appwriteConfig.cartItemsCollectionId,
+            [Query.equal('user_id', userId)]
+        );
+
+        for (const item of existing.documents) {
+            await databases.deleteDocument(
+                appwriteConfig.databaseId,
+                appwriteConfig.cartItemsCollectionId,
+                item.$id
+            );
+        }
+
+        console.log('✅ Cart cleared from server');
+    } catch (error: any) {
+        console.error('❌ Clear cart error:', error);
     }
 };

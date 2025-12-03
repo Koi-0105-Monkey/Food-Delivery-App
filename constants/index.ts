@@ -157,6 +157,45 @@ export const toppings = [
     },
 ];
 
+// 🔥 Mapping tên topping -> hình ảnh
+export const toppingImageMap: Record<string, any> = {
+    "Avocado": avocado,
+    "Bacon": bacon,
+    "Extra Cheese": cheese,
+    "Cheese": cheese,
+    "Cucumber": cucumber,
+    "Mushrooms": mushrooms,
+    "Onions": onions,
+    "Tomatoes": tomatoes,
+    "Jalapeños": cucumber, // Fallback
+    "Jalapeño": cucumber,
+    "Olives": cucumber,
+};
+
+// 🔥 Mapping tên side -> hình ảnh
+export const sideImageMap: Record<string, any> = {
+    "Fries": fries,
+    "French Fries": fries,
+    "Onion Rings": onionRings,
+    "Mozzarella Sticks": mozarellaSticks,
+    "Mozarella Sticks": mozarellaSticks,
+    "Cheese Sticks": mozarellaSticks,
+    "Coleslaw": coleslaw,
+    "Salad": salad,
+    "Coke": fries, // Fallback
+    "Coca Cola": fries,
+    "Iced Tea": fries,
+    "Lemon Iced Tea": fries,
+    "Garlic Bread": fries,
+    "Chicken Nuggets": fries,
+    "Chicken Bites": fries,
+    "Potato Wedges": fries,
+    "Potato Chips": fries,
+    "Sweet Corn": fries,
+    "Choco Lava Cake": fries,
+    "Chocolate Lava Cake": fries,
+};
+
 export const images = {
     avatar,
     avocado,
