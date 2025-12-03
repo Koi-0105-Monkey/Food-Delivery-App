@@ -1,11 +1,10 @@
-// lib/sepay-bidv.ts - SEPAY BIDV PAYMENT
+// lib/sepay-bidv.ts - SEPAY BIDV PAYMENT (React Native Compatible)
 
 /**
  * 🔥 SEPAY BIDV CONFIGURATION
  * Lấy từ my.sepay.vn
  */
 const SEPAY_CONFIG = {
-    apiKey: process.env.SEPAY_API_KEY || '',
     accountNumber: '96247C3FS8', // 👈 Số tài khoản BIDV từ ảnh
     accountName: 'HUYNH DUC KHOI',
     bankCode: 'BIDV',
@@ -48,26 +47,7 @@ export function generateSepayBIDVQR(amount: number, orderNumber: string): {
 }
 
 /**
- * ✅ Verify webhook signature từ Sepay
- * 
- * @param payload - Webhook payload từ Sepay
- * @param signature - Signature từ header
- * @returns true nếu hợp lệ
- */
-export function verifySepayWebhook(payload: any, signature: string): boolean {
-    const crypto = require('crypto');
-    const secret = process.env.SEPAY_WEBHOOK_SECRET || '';
-    
-    const expectedSignature = crypto
-        .createHmac('sha256', secret)
-        .update(JSON.stringify(payload))
-        .digest('hex');
-    
-    return signature === expectedSignature;
-}
-
-/**
- * ✅ Parse webhook data từ Sepay
+ * ✅ Parse webhook data từ Sepay (CHỈ DÙNG Ở BACKEND)
  */
 export interface SepayWebhookData {
     id: number;

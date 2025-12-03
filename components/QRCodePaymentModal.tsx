@@ -1,4 +1,4 @@
-// components/QRCodePaymentModal.tsx - SIMPLE QR VERSION
+// components/QRCodePaymentModal.tsx - BIDV ONLY VERSION
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -38,7 +38,6 @@ const QRCodePaymentModal = ({
     
     const [isLoading, setIsLoading] = useState(false);
     const [paymentData, setPaymentData] = useState<any>(null);
-    const [activeTab, setActiveTab] = useState<'momo' | 'agribank'>('momo');
 
     useEffect(() => {
         if (visible) {
@@ -71,8 +70,8 @@ const QRCodePaymentModal = ({
 
             const result = await createQRPayment(orderNumber, totalAmount);
 
-            if (result.success && result.momo) {
-                setPaymentData(result);
+            if (result.success && result.bidv) {
+                setPaymentData(result.bidv);
                 
                 // Start polling
                 startPolling();
@@ -127,8 +126,6 @@ const QRCodePaymentModal = ({
     };
 
     if (!visible) return null;
-
-    const currentPayment = activeTab === 'momo' ? paymentData?.momo : paymentData?.agribank;
 
     return (
         <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
@@ -194,7 +191,7 @@ const QRCodePaymentModal = ({
                             Đang tạo mã QR...
                         </Text>
                     </View>
-                ) : (
+                ) : paymentData ? (
                     <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
                         {/* Amount Display */}
                         <View
@@ -218,177 +215,132 @@ const QRCodePaymentModal = ({
                             </Text>
                         </View>
 
-                        {/* Payment Method Tabs */}
+                        {/* Payment Info - BIDV */}
                         <View
                             style={{
-                                flexDirection: 'row',
-                                backgroundColor: '#F3F4F6',
+                                backgroundColor: '#F9FAFB',
                                 borderRadius: 15,
-                                padding: 4,
+                                padding: 15,
                                 marginBottom: 20,
                             }}
                         >
-                            <TouchableOpacity
-                                onPress={() => setActiveTab('momo')}
-                                style={{
-                                    flex: 1,
-                                    paddingVertical: 12,
-                                    borderRadius: 12,
-                                    backgroundColor: activeTab === 'momo' ? '#D82D8B' : 'transparent',
-                                }}
-                            >
-                                <Text
-                                    className="paragraph-semibold text-center"
-                                    style={{ color: activeTab === 'momo' ? 'white' : '#878787' }}
-                                >
-                                    📱 Ví Momo
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                onPress={() => setActiveTab('agribank')}
-                                style={{
-                                    flex: 1,
-                                    paddingVertical: 12,
-                                    borderRadius: 12,
-                                    backgroundColor: activeTab === 'agribank' ? '#2F9B65' : 'transparent',
-                                }}
-                            >
-                                <Text
-                                    className="paragraph-semibold text-center"
-                                    style={{ color: activeTab === 'agribank' ? 'white' : '#878787' }}
-                                >
-                                    🏦 Agribank
-                                </Text>
-                            </TouchableOpacity>
+                            <Text className="paragraph-bold text-dark-100 mb-3">
+                                📋 Thông tin chuyển khoản:
+                            </Text>
+                            <View style={{ gap: 8 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                    <Text className="body-medium text-gray-200">Ngân hàng:</Text>
+                                    <Text className="body-medium text-dark-100">
+                                        BIDV
+                                    </Text>
+                                </View>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                    <Text className="body-medium text-gray-200">Người nhận:</Text>
+                                    <Text className="body-medium text-dark-100">
+                                        {paymentData.displayInfo.receiver}
+                                    </Text>
+                                </View>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                    <Text className="body-medium text-gray-200">Số TK:</Text>
+                                    <Text className="body-medium text-dark-100">
+                                        {paymentData.displayInfo.accountNo}
+                                    </Text>
+                                </View>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                    <Text className="body-medium text-gray-200">Số tiền:</Text>
+                                    <Text className="body-medium text-primary">
+                                        {paymentData.displayInfo.amount.toLocaleString('vi-VN')}đ
+                                    </Text>
+                                </View>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                    <Text className="body-medium text-gray-200">Nội dung:</Text>
+                                    <Text className="body-medium text-dark-100">
+                                        {paymentData.displayInfo.note}
+                                    </Text>
+                                </View>
+                            </View>
                         </View>
 
-                        {currentPayment && (
-                            <>
-                                {/* Payment Info */}
-                                <View
-                                    style={{
-                                        backgroundColor: '#F9FAFB',
-                                        borderRadius: 15,
-                                        padding: 15,
-                                        marginBottom: 20,
-                                    }}
-                                >
-                                    <Text className="paragraph-bold text-dark-100 mb-3">
-                                        📋 Thông tin chuyển khoản:
-                                    </Text>
-                                    <View style={{ gap: 8 }}>
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                            <Text className="body-medium text-gray-200">Người nhận:</Text>
-                                            <Text className="body-medium text-dark-100">
-                                                {currentPayment.displayInfo.receiver}
-                                            </Text>
-                                        </View>
-                                        {currentPayment.displayInfo.accountNo && (
-                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                                <Text className="body-medium text-gray-200">Số TK:</Text>
-                                                <Text className="body-medium text-dark-100">
-                                                    {currentPayment.displayInfo.accountNo}
-                                                </Text>
-                                            </View>
-                                        )}
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                            <Text className="body-medium text-gray-200">Số tiền:</Text>
-                                            <Text className="body-medium text-primary">
-                                                {currentPayment.displayInfo.amount.toLocaleString('vi-VN')}đ
-                                            </Text>
-                                        </View>
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                            <Text className="body-medium text-gray-200">Nội dung:</Text>
-                                            <Text className="body-medium text-dark-100">
-                                                {currentPayment.displayInfo.note}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                </View>
+                        {/* QR Code - BIDV */}
+                        <View
+                            style={{
+                                backgroundColor: 'white',
+                                borderRadius: 20,
+                                padding: 20,
+                                alignItems: 'center',
+                                borderWidth: 2,
+                                borderColor: '#005BAA',
+                                marginBottom: 20,
+                            }}
+                        >
+                            <Text className="base-bold text-dark-100 mb-4">
+                                🏦 Quét bằng app BIDV Smart Banking
+                            </Text>
+                            <Image
+                                source={{ uri: paymentData.qrCodeUrl }}
+                                style={{ width: 320, height: 320 }}
+                                resizeMode="contain"
+                            />
+                            <Text className="body-regular text-gray-200 mt-4 text-center">
+                                Số tiền và nội dung đã được điền sẵn
+                            </Text>
+                        </View>
 
-                                {/* QR Code */}
-                                <View
-                                    style={{
-                                        backgroundColor: 'white',
-                                        borderRadius: 20,
-                                        padding: 20,
-                                        alignItems: 'center',
-                                        borderWidth: 2,
-                                        borderColor: activeTab === 'momo' ? '#D82D8B' : '#2F9B65',
-                                        marginBottom: 20,
-                                    }}
-                                >
-                                    <Text className="base-bold text-dark-100 mb-4">
-                                        {activeTab === 'momo' ? '📱 Quét bằng app Momo hoặc Banking' : '🏦 Quét bằng app Agribank'}
-                                    </Text>
-                                    <Image
-                                        source={{ uri: currentPayment.qrCodeUrl }}
-                                        style={{ width: 320, height: 320 }}
-                                        resizeMode="contain"
-                                    />
-                                    <Text className="body-regular text-gray-200 mt-4 text-center">
-                                        Số tiền và nội dung đã được điền sẵn
-                                    </Text>
-                                </View>
+                        {/* Instructions - BIDV */}
+                        <View
+                            style={{
+                                backgroundColor: '#E8F5E9',
+                                borderRadius: 15,
+                                padding: 20,
+                                marginBottom: 20,
+                            }}
+                        >
+                            <Text className="paragraph-bold text-dark-100 mb-3">
+                                ✅ Hướng dẫn thanh toán:
+                            </Text>
+                            <Text className="body-regular text-gray-200">
+                                1️⃣ Mở app BIDV Smart Banking{'\n'}
+                                2️⃣ Chọn "Quét mã QR"{'\n'}
+                                3️⃣ Quét mã QR phía trên{'\n'}
+                                4️⃣ Kiểm tra thông tin → Xác nhận{'\n'}
+                                5️⃣ Đợi xác nhận (tự động trong vài giây)
+                            </Text>
+                        </View>
 
-                                {/* Instructions */}
-                                <View
-                                    style={{
-                                        backgroundColor: '#E8F5E9',
-                                        borderRadius: 15,
-                                        padding: 20,
-                                        marginBottom: 20,
-                                    }}
-                                >
-                                    <Text className="paragraph-bold text-dark-100 mb-3">
-                                        ✅ Hướng dẫn thanh toán:
-                                    </Text>
-                                    <Text className="body-regular text-gray-200">
-                                        1️⃣ Mở app {activeTab === 'momo' ? 'Momo/Banking' : 'Agribank'}{'\n'}
-                                        2️⃣ Chọn "Quét mã QR"{'\n'}
-                                        3️⃣ Quét mã QR phía trên{'\n'}
-                                        4️⃣ Kiểm tra thông tin → Xác nhận{'\n'}
-                                        5️⃣ Đợi xác nhận (tự động trong vài giây)
-                                    </Text>
-                                </View>
+                        {/* Warning */}
+                        <View
+                            style={{
+                                backgroundColor: '#FFF5E6',
+                                borderRadius: 15,
+                                padding: 15,
+                                flexDirection: 'row',
+                                alignItems: 'flex-start',
+                                gap: 10,
+                                marginBottom: 20,
+                            }}
+                        >
+                            <Text style={{ fontSize: 24 }}>⚠️</Text>
+                            <View style={{ flex: 1 }}>
+                                <Text className="body-medium text-dark-100">
+                                    <Text className="base-bold">Quan trọng:</Text> Vui lòng{' '}
+                                    <Text className="base-bold text-error">KHÔNG THAY ĐỔI</Text>
+                                    {' '}số tiền và nội dung chuyển khoản để đơn hàng được xác nhận tự động!
+                                </Text>
+                            </View>
+                        </View>
 
-                                {/* Warning */}
-                                <View
-                                    style={{
-                                        backgroundColor: '#FFF5E6',
-                                        borderRadius: 15,
-                                        padding: 15,
-                                        flexDirection: 'row',
-                                        alignItems: 'flex-start',
-                                        gap: 10,
-                                        marginBottom: 20,
-                                    }}
-                                >
-                                    <Text style={{ fontSize: 24 }}>⚠️</Text>
-                                    <View style={{ flex: 1 }}>
-                                        <Text className="body-medium text-dark-100">
-                                            <Text className="base-bold">Quan trọng:</Text> Vui lòng{' '}
-                                            <Text className="base-bold text-error">KHÔNG THAY ĐỔI</Text>
-                                            {' '}số tiền và nội dung chuyển khoản để đơn hàng được xác nhận tự động!
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                {/* Loading Animation */}
-                                <View className="flex-center mt-10 mb-20">
-                                    <ActivityIndicator size="large" color="#2F9B65" />
-                                    <Text className="paragraph-medium text-gray-200 mt-4 text-center">
-                                        Đang chờ xác nhận thanh toán...{'\n'}
-                                        <Text className="body-regular">
-                                            (Tự động cập nhật sau khi bạn chuyển tiền)
-                                        </Text>
-                                    </Text>
-                                </View>
-                            </>
-                        )}
+                        {/* Loading Animation */}
+                        <View className="flex-center mt-10 mb-20">
+                            <ActivityIndicator size="large" color="#005BAA" />
+                            <Text className="paragraph-medium text-gray-200 mt-4 text-center">
+                                Đang chờ xác nhận thanh toán...{'\n'}
+                                <Text className="body-regular">
+                                    (Tự động cập nhật sau khi bạn chuyển tiền)
+                                </Text>
+                            </Text>
+                        </View>
                     </ScrollView>
-                )}
+                ) : null}
             </Animated.View>
         </Modal>
     );
