@@ -129,24 +129,10 @@ npm start
 ```
 
 
-1. Đăng ký tài khoản ngrok (miễn phí)
-Truy cập:
-👉 https://dashboard.ngrok.com/signup
-Đăng ký bằng email hoặc GitHub/Google đều được.
-Nhớ xác nhận email — nếu chưa verify, authtoken sẽ không hoạt động → y chang lỗi bạn gặp.
-2. Lấy authtoken
-Sau khi đăng nhập → vào trang:
-👉 https://dashboard.ngrok.com/get-started/your-authtoken
-Bạn sẽ thấy 1 dòng giống:
-ngrok config add-authtoken <TOKEN_CỦA_BẠN>
-3. Dán token vào máy
-Trên terminal:
-ngrok config add-authtoken <TOKEN>
-hoặc nếu bạn chưa cài ngrok:
-npm install -g ngrok
-ngrok config add-authtoken <TOKEN>
-4. Chạy lại
-ngrok http 3000
+Sign up for an ngrok account (free) Go to: 👉 https://dashboard.ngrok.com/signup Sign up with email or GitHub/Google. Remember to confirm email — if not verified, authtoken will not work → same error you encountered.
+Get authtoken After logging in → go to page: 👉 https://dashboard.ngrok.com/get-started/your-authtoken You will see a line like: ngrok config add-authtoken <YOUR_TOKEN>
+Paste token into the machine On terminal: ngrok config add-authtoken or if you haven't installed ngrok: npm install -g ngrok ngrok config add-authtoken
+Run ngrok http 3000 again
 
 Link figma:
 https://www.figma.com/design/FIe3i6vwpWeUOvVwno7ua3/Food-Delivery-App?node-id=0-1&p=f
