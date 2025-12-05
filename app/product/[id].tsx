@@ -10,6 +10,7 @@ import { useCartStore } from '@/store/cart.store';
 import { databases, appwriteConfig } from '@/lib/appwrite';
 import { Query } from 'react-native-appwrite';
 import CustomButton from '@/components/CustomButton';
+import Toast from '@/components/Toast';
 import cn from 'clsx';
 
 const ProductDetail = () => {
@@ -133,6 +134,9 @@ const ProductDetail = () => {
         return (basePrice + customizationPrice) * quantity;
     };
 
+    const [showToast, setShowToast] = useState(false);
+    const [toastMessage, setToastMessage] = useState('');
+
     const handleAddToCart = () => {
         if (!product) return;
 
@@ -149,14 +153,9 @@ const ProductDetail = () => {
             });
         }
 
-        Alert.alert(
-            'Added to Cart! 🛒',
-            `${quantity}x ${product.name} added to your cart`,
-            [
-                { text: 'Continue Shopping', style: 'cancel' },
-                { text: 'View Cart', onPress: () => router.push('/cart') },
-            ]
-        );
+        // Show toast notification
+        setToastMessage(`✅ ${quantity}x ${product.name} added to cart!`);
+        setShowToast(true);
 
         // Reset selections
         setQuantity(1);
@@ -396,6 +395,14 @@ const ProductDetail = () => {
                     onPress={handleAddToCart}
                 />
             </View>
+
+            {/* Toast Notification */}
+            <Toast
+                visible={showToast}
+                message={toastMessage}
+                type="success"
+                onHide={() => setShowToast(false)}
+            />
         </SafeAreaView>
     );
 };

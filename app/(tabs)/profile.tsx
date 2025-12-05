@@ -1,8 +1,9 @@
-// app/(tabs)/profile.tsx - WITH ORDER HISTORY
+// app/(tabs)/profile.tsx - ENHANCED WITH PENDING & COMPLETED ORDERS
 
+import React, { useEffect, useState } from 'react';
 import { View, Text, Image, ScrollView, TouchableOpacity, Alert, Linking, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import useAuthStore from '@/store/auth.store';
 import { useAddressStore } from '@/store/address.store';
 import { images } from '@/constants';
@@ -11,9 +12,7 @@ import { account } from '@/lib/appwrite';
 import AddressListModal from '@/components/AddressListModal';
 import AddEditAddressModal from '@/components/AddEditAddressModal';
 import EditProfileModal from '@/components/EditProfileModal';
-import OrderInvoice from '@/components/OrderInvoice';
 import { Address } from '@/store/address.store';
-import { Order } from '@/type';
 import { getUserOrders } from '@/lib/payment';
 
 const ProfileField = ({ label, value, icon }: { label: string; value: string; icon: any }) => (
@@ -37,32 +36,53 @@ const Profile = () => {
     const [editingAddress, setEditingAddress] = useState<Address | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
     
-    // ✅ Order History State
-    const [orders, setOrders] = useState<Order[]>([]);
-    const [loadingOrders, setLoadingOrders] = useState(false);
-    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-    const [showInvoice, setShowInvoice] = useState(false);
+    // ✅ Order History State - Check if has orders (for showing buttons)
+    const [hasPendingOrders, setHasPendingOrders] = useState(false);
+    const [hasCompletedOrders, setHasCompletedOrders] = useState(false);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
 
     useEffect(() => {
         if (user) {
             fetchAddresses();
-            loadOrders();
         }
     }, [user]);
 
-    // ✅ Load orders
-    const loadOrders = async () => {
+    // ✅ Refresh orders count when screen is focused
+    useFocusEffect(
+        React.useCallback(() => {
+            if (user) {
+                checkOrdersCount();
+            }
+        }, [user])
+    );
+
+    // ✅ Check orders count (silently, no logs)
+    const checkOrdersCount = async () => {
         if (!user) return;
         
         try {
-            setLoadingOrders(true);
             const userOrders = await getUserOrders(user.$id);
-            setOrders(userOrders);
-            console.log(`✅ Loaded ${userOrders.length} orders`);
+            
+            // Split orders into pending and completed
+            const pending = userOrders.filter(order => 
+                order.payment_status === 'pending' || 
+                order.payment_status === 'failed'
+            );
+            
+            const completed = userOrders.filter(order => 
+                order.payment_status === 'paid'
+            );
+            
+            setHasPendingOrders(pending.length > 0);
+            setHasCompletedOrders(completed.length > 0);
+            
+            // Only log on initial app load
+            if (isInitialLoad) {
+                console.log(`✅ Loaded ${pending.length} pending, ${completed.length} completed orders`);
+                setIsInitialLoad(false);
+            }
         } catch (error) {
-            console.error('Failed to load orders:', error);
-        } finally {
-            setLoadingOrders(false);
+            console.error('Failed to check orders count:', error);
         }
     };
 
@@ -134,20 +154,9 @@ const Profile = () => {
         }, 300);
     };
 
-    // ✅ View order invoice
-    const handleViewOrder = (order: Order) => {
-        setSelectedOrder(order);
-        setShowInvoice(true);
-    };
-
-    // Get status color
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'paid': return '#2F9B65';
-            case 'pending': return '#FE8C00';
-            case 'failed': return '#F14141';
-            default: return '#878787';
-        }
+    // ✅ Navigate to orders screen
+    const handleViewOrders = (type: 'pending' | 'completed') => {
+        router.push(`/orders?type=${type}`);
     };
 
     return (
@@ -285,65 +294,46 @@ const Profile = () => {
                         </TouchableOpacity>
                     )}
 
-                    {/* ✅ Order History */}
-                    <View className="mt-4">
-                        <Text className="base-bold text-dark-100 mb-4">Order History</Text>
-                        
-                        {loadingOrders ? (
-                            <View className="flex-center py-10">
-                                <ActivityIndicator size="large" color="#FE8C00" />
-                            </View>
-                        ) : orders.length === 0 ? (
-                            <View className="bg-white border border-gray-200 rounded-2xl p-10 flex-center">
-                                <Text className="paragraph-medium text-gray-200">
-                                    No orders yet
-                                </Text>
-                            </View>
-                        ) : (
-                            orders.slice(0, 5).map((order) => (
+                    {/* ✅ Order History Buttons */}
+                    {(hasPendingOrders || hasCompletedOrders) && (
+                        <View className="mt-4">
+                            <Text className="base-bold text-dark-100 mb-4">📦 Order History</Text>
+                            
+                            {hasPendingOrders && (
                                 <TouchableOpacity
-                                    key={order.$id}
-                                    className="bg-white border border-gray-200 rounded-2xl p-4 mb-3"
-                                    onPress={() => handleViewOrder(order)}
+                                    className="bg-white border border-gray-200 rounded-2xl p-5 flex-row items-center justify-between mb-3"
+                                    onPress={() => handleViewOrders('pending')}
                                 >
-                                    <View className="flex-row items-center justify-between mb-2">
-                                        <Text className="paragraph-bold text-dark-100">
-                                            {order.order_number}
-                                        </Text>
-                                        <View
-                                            style={{
-                                                backgroundColor: getStatusColor(order.payment_status) + '20',
-                                                paddingHorizontal: 12,
-                                                paddingVertical: 4,
-                                                borderRadius: 12,
-                                            }}
-                                        >
-                                            <Text
-                                                className="small-bold"
-                                                style={{ color: getStatusColor(order.payment_status) }}
-                                            >
-                                                {order.payment_status === 'paid' ? 'Paid' : 
-                                                 order.payment_status === 'pending' ? 'Pending' : 'Failed'}
-                                            </Text>
+                                    <View className="flex-row items-center gap-3">
+                                        <View className="size-12 rounded-full bg-primary/10 flex-center">
+                                            <Text className="text-2xl">⏳</Text>
                                         </View>
-                                    </View>
-                                    
-                                    <Text className="body-regular text-gray-200 mb-2">
-                                        {new Date(order.$createdAt).toLocaleDateString('vi-VN')}
-                                    </Text>
-                                    
-                                    <View className="flex-row items-center justify-between">
-                                        <Text className="paragraph-semibold text-primary">
-                                            {order.total.toLocaleString('vi-VN')}đ
-                                        </Text>
-                                        <Text className="body-medium text-gray-200">
-                                            View Invoice →
+                                        <Text className="paragraph-semibold text-dark-100">
+                                            View Pending Orders
                                         </Text>
                                     </View>
+                                    <Image source={images.arrowRight} className="size-5" resizeMode="contain" />
                                 </TouchableOpacity>
-                            ))
-                        )}
-                    </View>
+                            )}
+
+                            {hasCompletedOrders && (
+                                <TouchableOpacity
+                                    className="bg-white border border-gray-200 rounded-2xl p-5 flex-row items-center justify-between"
+                                    onPress={() => handleViewOrders('completed')}
+                                >
+                                    <View className="flex-row items-center gap-3">
+                                        <View className="size-12 rounded-full bg-success/10 flex-center">
+                                            <Text className="text-2xl">✓</Text>
+                                        </View>
+                                        <Text className="paragraph-semibold text-dark-100">
+                                            View Transaction History
+                                        </Text>
+                                    </View>
+                                    <Image source={images.arrowRight} className="size-5" resizeMode="contain" />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    )}
 
                     {/* Logout */}
                     <TouchableOpacity
@@ -404,17 +394,6 @@ const Profile = () => {
                 editAddress={editingAddress}
             />
 
-            {/* ✅ Order Invoice Modal */}
-            {selectedOrder && (
-                <OrderInvoice
-                    visible={showInvoice}
-                    onClose={() => {
-                        setShowInvoice(false);
-                        setSelectedOrder(null);
-                    }}
-                    order={selectedOrder}
-                />
-            )}
         </SafeAreaView>
     );
 };

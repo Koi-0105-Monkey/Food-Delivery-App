@@ -191,6 +191,65 @@ const Cart = () => {
         }
     };
 
+    const handleCancelToPending = () => {
+        Alert.alert(
+            'Order Saved as Pending 📦',
+            'Your order has been saved. Please clear your cart to continue shopping.',
+            [
+                {
+                    text: 'Clear Cart',
+                    onPress: async () => {
+                        await clearCart();
+                        setCurrentOrder(null);
+                    },
+                },
+                {
+                    text: 'Keep Items',
+                    style: 'cancel',
+                },
+            ]
+        );
+    };
+
+    const handleSwitchToCard = () => {
+        setShowQRModal(false);
+        setTimeout(() => {
+            setShowCardModal(true);
+        }, 300);
+    };
+
+    const handleSwitchToCOD = async () => {
+        if (!currentOrder) return;
+        
+        try {
+            // Update order to COD
+            await updatePaymentStatus(currentOrder.$id, 'paid', `COD${Date.now()}`);
+            await clearCart();
+            
+            Alert.alert(
+                'Order Updated! 🎉',
+                `Order #${currentOrder.order_number} has been updated to Cash on Delivery.`,
+                [
+                    {
+                        text: 'View Order',
+                        onPress: () => router.push('/profile'),
+                    },
+                ]
+            );
+            
+            setShowQRModal(false);
+            setCurrentOrder(null);
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Unable to update order');
+        }
+    };
+
+    const handleRefreshOrders = () => {
+        // This will be called from profile page
+        // For now, just navigate to profile to refresh
+        router.push('/profile');
+    };
+
     if (isProcessing) {
         return (
             <SafeAreaView className="bg-white h-full flex-center">
@@ -276,6 +335,10 @@ const Cart = () => {
                     totalAmount={total}
                     orderNumber={currentOrder.order_number}
                     orderId={currentOrder.$id}
+                    onCancelToPending={handleCancelToPending}
+                    onRefresh={handleRefreshOrders}
+                    onSwitchToCard={handleSwitchToCard}
+                    onSwitchToCOD={handleSwitchToCOD}
                 />
             )}
 
@@ -287,6 +350,9 @@ const Cart = () => {
                     onConfirmPayment={handleConfirmCardPayment}
                     totalAmount={total}
                     orderNumber={currentOrder.order_number}
+                    orderId={currentOrder.$id}
+                    onCancelToPending={handleCancelToPending}
+                    onRefresh={handleRefreshOrders}
                 />
             )}
         </SafeAreaView>
