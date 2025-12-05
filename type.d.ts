@@ -123,7 +123,7 @@ interface GetMenuParams {
 
 // type.d.ts - Thêm vào file type.d.ts hiện có
 
-export type PaymentMethod = 'cod' | 'momo' | 'card';
+export type PaymentMethod = 'cod' | 'bidv' | 'card';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'cancelled';
 export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'delivering' | 'completed' | 'cancelled';
 
@@ -180,18 +180,6 @@ export interface CardPaymentData {
     cardHolder: string;
     expiryDate: string;  // ✅ Dùng format MM/YY (đơn giản hơn)
     cvv: string;
-}
-
-export interface CreateOrderParams {
-    items: OrderItem[];
-    subtotal: number;
-    delivery_fee: number;
-    discount: number;
-    total: number;
-    delivery_address: string;
-    delivery_phone: string;
-    delivery_notes?: string;
-    payment_method: PaymentMethod;
 }
 
 export interface QRCodeData {

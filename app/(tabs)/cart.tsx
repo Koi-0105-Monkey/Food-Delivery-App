@@ -1,4 +1,4 @@
-// app/(tabs)/cart.tsx - STATIC QR VERSION
+// app/(tabs)/cart.tsx - FIXED VERSION
 
 import { View, Text, FlatList, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -85,7 +85,18 @@ const Cart = () => {
                 customizations: item.customizations || [],
             }));
 
-            // Create order
+            // ✅ FIX: Lưu payment_method chính xác
+            let paymentMethodToSave: string;
+            
+            if (method === 'cod') {
+                paymentMethodToSave = 'cod';
+            } else if (method === 'qr') {
+                paymentMethodToSave = 'bidv'; // ✅ Lưu tên ngân hàng, không phải "momo"
+            } else {
+                paymentMethodToSave = 'card';
+            }
+
+            // Create order với payment_method đúng
             const order = await createOrder(user.$id, {
                 items: orderItems,
                 subtotal,
@@ -94,7 +105,7 @@ const Cart = () => {
                 total,
                 delivery_address: defaultAddress?.fullAddress || '',
                 delivery_phone: user.phone || '',
-                payment_method: method === 'qr' ? 'momo' : method,
+                payment_method: paymentMethodToSave, // ✅ Lưu ngân hàng thực tế
             });
 
             setCurrentOrder(order);
@@ -115,7 +126,7 @@ const Cart = () => {
                     ]
                 );
             } else if (method === 'qr') {
-                // ✅ Static QR Payment - Show modal with QR code
+                // QR Payment - Show modal
                 setShowQRModal(true);
             } else if (method === 'card') {
                 // Card Payment
@@ -256,7 +267,7 @@ const Cart = () => {
                 />
             )}
 
-            {/* QR Code Payment Modal - Static QR */}
+            {/* QR Code Payment Modal */}
             {currentOrder && showQRModal && (
                 <QRCodePaymentModal
                     visible={showQRModal}
