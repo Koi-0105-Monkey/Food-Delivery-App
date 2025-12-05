@@ -17,7 +17,7 @@ function generateOrderNumber(): string {
 }
 
 /**
- * ✅ TẠO QR PAYMENT - BIDV qua Sepay
+ * ✅ CREATE QR PAYMENT - BIDV via Sepay
  */
 export async function createQRPayment(
     orderNumber: string, 
@@ -32,13 +32,13 @@ export async function createQRPayment(
         if (amount < 1000) {
             return {
                 success: false,
-                message: 'Số tiền tối thiểu là 1,000đ',
+                message: 'Minimum amount is 1,000 VND',
             };
         }
 
-        console.log('✅ Tạo QR Payment BIDV');
-        console.log('💰 Số tiền:', amount.toLocaleString('vi-VN') + 'đ');
-        console.log('📝 Đơn hàng:', orderNumber);
+        console.log('✅ Creating BIDV QR Payment');
+        console.log('💰 Amount:', amount.toLocaleString('vi-VN') + '₫');
+        console.log('📝 Order:', orderNumber);
 
         // Generate BIDV QR code
         const paymentData = generateSepayBIDVQR(amount, orderNumber);
@@ -55,13 +55,13 @@ export async function createQRPayment(
         console.error('❌ Payment error:', error);
         return {
             success: false,
-            message: error.message || 'Không thể tạo thanh toán',
+            message: error.message || 'Unable to create payment',
         };
     }
 }
 
 /**
- * ✅ Polling payment status - Check mỗi 3s
+ * ✅ Polling payment status - Check every 3s
  */
 export async function pollPaymentStatus(
     orderId: string, 
@@ -79,18 +79,18 @@ export async function pollPaymentStatus(
                 
                 if (order) {
                     if (order.payment_status === 'paid') {
-                        console.log('✅ Thanh toán thành công qua webhook!');
+                        console.log('✅ Payment confirmed via webhook!');
                         clearInterval(interval);
                         resolve(true);
                     } else if (order.payment_status === 'failed') {
-                        console.log('❌ Thanh toán thất bại');
+                        console.log('❌ Payment failed');
                         clearInterval(interval);
                         resolve(false);
                     }
                 }
                 
                 if (attempts >= maxAttempts) {
-                    console.log('⏰ Hết thời gian chờ');
+                    console.log('⏰ Timeout while waiting');
                     clearInterval(interval);
                     resolve(false);
                 }
@@ -105,7 +105,7 @@ export async function pollPaymentStatus(
 }
 
 /**
- * Tạo order
+ * Create order
  */
 export async function createOrder(userId: string, params: CreateOrderParams): Promise<Order> {
     try {
@@ -133,11 +133,11 @@ export async function createOrder(userId: string, params: CreateOrderParams): Pr
             }
         );
         
-        console.log('✅ Đơn hàng đã tạo:', orderNumber);
+        console.log('✅ Order created:', orderNumber);
         return orderDoc as Order;
     } catch (error: any) {
-        console.error('❌ Lỗi tạo đơn:', error);
-        throw new Error(error.message || 'Không thể tạo đơn hàng');
+        console.error('❌ Order creation error:', error);
+        throw new Error(error.message || 'Unable to create order');
     }
 }
 
@@ -195,9 +195,9 @@ export async function updatePaymentStatus(
             }
         );
         
-        console.log(`✅ Cập nhật trạng thái: ${status}`);
+        console.log(`✅ Status updated: ${status}`);
     } catch (error: any) {
         console.error('❌ Update payment error:', error);
-        throw new Error(error.message || 'Không thể cập nhật thanh toán');
+        throw new Error(error.message || 'Unable to update payment status');
     }
 }
