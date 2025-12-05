@@ -78,6 +78,7 @@ export default function Index() {
                                 className={cn('offer-card', isEven ? 'flex-row-reverse' : 'flex-row')}
                                 style={{ backgroundColor: item.color }}
                                 android_ripple={{ color: '#fffff22' }}
+                                onPress={() => router.push(`/combo/${item.id}`)}
                             >
                                 {({ pressed }) => (
                                     <Fragment>

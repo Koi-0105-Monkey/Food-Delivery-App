@@ -1,6 +1,6 @@
 // components/OrderInvoice.tsx - Hoá đơn đơn hàng
 
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -10,19 +10,39 @@ import {
     TouchableOpacity,
     Image,
     ScrollView,
+    Alert,
+    ActivityIndicator,
+    TextInput,
 } from 'react-native';
 import { images } from '@/constants';
-import { Order, OrderItem } from '@/type';
+import { Order, OrderItem, CardPaymentData } from '@/type';
+import { createQRPayment, updatePaymentStatus } from '@/lib/payment';
 
 interface OrderInvoiceProps {
     visible: boolean;
     onClose: () => void;
     order: Order;
+    onCancel?: () => void;
+    onRefresh?: () => void;
+    onSwitchPaymentMethod?: (method: 'qr' | 'card' | 'cod') => void;
 }
 
-const OrderInvoice = ({ visible, onClose, order }: OrderInvoiceProps) => {
+const OrderInvoice = ({ visible, onClose, order, onCancel, onRefresh, onSwitchPaymentMethod }: OrderInvoiceProps) => {
     const slideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
+    
+    // QR Payment state
+    const [qrPaymentData, setQrPaymentData] = useState<any>(null);
+    const [isLoadingQR, setIsLoadingQR] = useState(false);
+    
+    // Card Payment state
+    const [cardForm, setCardForm] = useState<CardPaymentData>({
+        cardNumber: '',
+        cardHolder: '',
+        expiryDate: '',
+        cvv: '',
+    });
+    const [isProcessingCard, setIsProcessingCard] = useState(false);
 
     React.useEffect(() => {
         if (visible) {
@@ -39,11 +59,81 @@ const OrderInvoice = ({ visible, onClose, order }: OrderInvoiceProps) => {
                     useNativeDriver: true,
                 }),
             ]).start();
+            
+            // Load QR code if order is pending and payment method is bidv
+            if (order.payment_status === 'pending' && order.payment_method === 'bidv') {
+                loadQRPayment();
+            }
         } else {
             slideAnim.setValue(Dimensions.get('window').height);
             opacityAnim.setValue(0);
+            setQrPaymentData(null);
+            setCardForm({
+                cardNumber: '',
+                cardHolder: '',
+                expiryDate: '',
+                cvv: '',
+            });
         }
-    }, [visible]);
+    }, [visible, order]);
+
+    const loadQRPayment = async () => {
+        try {
+            setIsLoadingQR(true);
+            const result = await createQRPayment(order.order_number, order.total);
+            if (result.success && result.bidv) {
+                setQrPaymentData(result.bidv);
+            }
+        } catch (error) {
+            console.error('Failed to load QR payment:', error);
+        } finally {
+            setIsLoadingQR(false);
+        }
+    };
+
+    const formatCardNumber = (text: string) => {
+        const cleaned = text.replace(/\s/g, '');
+        const groups = cleaned.match(/.{1,4}/g) || [];
+        return groups.join(' ').substring(0, 19);
+    };
+
+    const formatExpiryDate = (text: string) => {
+        const cleaned = text.replace(/\//g, '');
+        if (cleaned.length >= 2) {
+            return `${cleaned.substring(0, 2)}/${cleaned.substring(2, 4)}`;
+        }
+        return cleaned;
+    };
+
+    const handleCardPayment = async () => {
+        const cardNumber = cardForm.cardNumber.replace(/\s/g, '');
+        
+        if (cardNumber.length < 13 || cardNumber.length > 19) {
+            return Alert.alert('Error', 'Invalid card number');
+        }
+        if (!cardForm.cardHolder.trim()) {
+            return Alert.alert('Error', 'Please enter card holder name');
+        }
+        if (!cardForm.expiryDate.match(/^\d{2}\/\d{2}$/)) {
+            return Alert.alert('Error', 'Invalid expiry date (MM/YY)');
+        }
+        if (cardForm.cvv.length < 3) {
+            return Alert.alert('Error', 'Invalid CVV');
+        }
+
+        setIsProcessingCard(true);
+        try {
+            const transactionId = `CARD${Date.now()}`;
+            await updatePaymentStatus(order.$id, 'paid', transactionId);
+            Alert.alert('Success', 'Payment successful!');
+            if (onRefresh) onRefresh();
+            handleClose();
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Unable to process payment');
+        } finally {
+            setIsProcessingCard(false);
+        }
+    };
 
     const handleClose = () => {
         Animated.parallel([
@@ -390,6 +480,265 @@ const OrderInvoice = ({ visible, onClose, order }: OrderInvoiceProps) => {
                         </View>
                     </View>
 
+                    {/* Payment Section - For Pending Orders from QR or Card */}
+                    {(order.payment_status === 'pending' || order.payment_status === 'failed') && 
+                     (order.payment_method === 'bidv' || order.payment_method === 'card') && (
+                        <View style={{ marginTop: 20 }}>
+                            <Text className="base-bold text-dark-100 mb-4">
+                                💳 Payment Information
+                            </Text>
+
+                            {/* QR Payment Display */}
+                            {order.payment_method === 'bidv' && (
+                                <View>
+                                    {isLoadingQR ? (
+                                        <View style={{ alignItems: 'center', padding: 20 }}>
+                                            <ActivityIndicator size="large" color="#005BAA" />
+                                            <Text className="body-regular text-gray-200 mt-4">
+                                                Loading QR code...
+                                            </Text>
+                                        </View>
+                                    ) : qrPaymentData ? (
+                                        <View
+                                            style={{
+                                                backgroundColor: '#F9FAFB',
+                                                borderRadius: 15,
+                                                padding: 15,
+                                                marginBottom: 15,
+                                            }}
+                                        >
+                                            <Text className="paragraph-bold text-dark-100 mb-3">
+                                                📋 Transfer Information:
+                                            </Text>
+                                            <View style={{ gap: 8 }}>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                    <Text className="body-medium text-gray-200">Bank:</Text>
+                                                    <Text className="body-medium text-dark-100">BIDV</Text>
+                                                </View>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                    <Text className="body-medium text-gray-200">Receiver:</Text>
+                                                    <Text className="body-medium text-dark-100">
+                                                        {qrPaymentData.displayInfo.receiver}
+                                                    </Text>
+                                                </View>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                    <Text className="body-medium text-gray-200">Account No.:</Text>
+                                                    <Text className="body-medium text-dark-100">
+                                                        {qrPaymentData.displayInfo.accountNo}
+                                                    </Text>
+                                                </View>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                    <Text className="body-medium text-gray-200">Amount:</Text>
+                                                    <Text className="body-medium text-primary">
+                                                        {qrPaymentData.displayInfo.amount.toLocaleString('vi-VN')}đ
+                                                    </Text>
+                                                </View>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                    <Text className="body-medium text-gray-200">Transfer Note:</Text>
+                                                    <Text className="body-medium text-dark-100">
+                                                        {qrPaymentData.displayInfo.note}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    ) : null}
+
+                                    {qrPaymentData && (
+                                        <View
+                                            style={{
+                                                backgroundColor: 'white',
+                                                borderRadius: 20,
+                                                padding: 20,
+                                                alignItems: 'center',
+                                                borderWidth: 2,
+                                                borderColor: '#005BAA',
+                                                marginBottom: 15,
+                                            }}
+                                        >
+                                            <Text className="base-bold text-dark-100 mb-4">
+                                                🏦 Scan using BIDV Smart Banking
+                                            </Text>
+                                            <Image
+                                                source={{ uri: qrPaymentData.qrCodeUrl }}
+                                                style={{ width: 280, height: 280 }}
+                                                resizeMode="contain"
+                                            />
+                                        </View>
+                                    )}
+
+                                    {/* Alternative Payment Options */}
+                                    <View style={{ marginTop: 15 }}>
+                                        <Text className="base-bold text-dark-100 mb-3 text-center">
+                                            Or pay with other methods:
+                                        </Text>
+                                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                                            {onSwitchPaymentMethod && (
+                                                <>
+                                                    <TouchableOpacity
+                                                        onPress={() => onSwitchPaymentMethod('card')}
+                                                        style={{
+                                                            flex: 1,
+                                                            backgroundColor: '#FE8C00',
+                                                            borderRadius: 15,
+                                                            padding: 15,
+                                                            alignItems: 'center',
+                                                        }}
+                                                    >
+                                                        <Text className="base-bold text-white">
+                                                            💳 Pay by Card
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity
+                                                        onPress={() => onSwitchPaymentMethod('cod')}
+                                                        style={{
+                                                            flex: 1,
+                                                            backgroundColor: '#2F9B65',
+                                                            borderRadius: 15,
+                                                            padding: 15,
+                                                            alignItems: 'center',
+                                                        }}
+                                                    >
+                                                        <Text className="base-bold text-white">
+                                                            💵 Pay on Delivery
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                </>
+                                            )}
+                                        </View>
+                                    </View>
+                                </View>
+                            )}
+
+                            {/* Card Payment Form */}
+                            {order.payment_method === 'card' && (
+                                <View>
+                                    <View style={{ gap: 15, marginBottom: 15 }}>
+                                        <View>
+                                            <Text className="label">Card Number *</Text>
+                                            <TextInput
+                                                className="input border-gray-300"
+                                                placeholder="1234 5678 9012 3456"
+                                                value={cardForm.cardNumber}
+                                                onChangeText={(text) => 
+                                                    setCardForm(prev => ({ ...prev, cardNumber: formatCardNumber(text) }))
+                                                }
+                                                keyboardType="numeric"
+                                                maxLength={19}
+                                                placeholderTextColor="#888"
+                                            />
+                                        </View>
+
+                                        <View>
+                                            <Text className="label">Card Holder Name *</Text>
+                                            <TextInput
+                                                className="input border-gray-300"
+                                                placeholder="JOHN DOE"
+                                                value={cardForm.cardHolder}
+                                                onChangeText={(text) => 
+                                                    setCardForm(prev => ({ ...prev, cardHolder: text.toUpperCase() }))
+                                                }
+                                                autoCapitalize="characters"
+                                                placeholderTextColor="#888"
+                                            />
+                                        </View>
+
+                                        <View style={{ flexDirection: 'row', gap: 15 }}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text className="label">Expiry Date *</Text>
+                                                <TextInput
+                                                    className="input border-gray-300"
+                                                    placeholder="MM/YY"
+                                                    value={cardForm.expiryDate}
+                                                    onChangeText={(text) => 
+                                                        setCardForm(prev => ({ ...prev, expiryDate: formatExpiryDate(text) }))
+                                                    }
+                                                    keyboardType="numeric"
+                                                    maxLength={5}
+                                                    placeholderTextColor="#888"
+                                                />
+                                            </View>
+
+                                            <View style={{ flex: 1 }}>
+                                                <Text className="label">CVV *</Text>
+                                                <TextInput
+                                                    className="input border-gray-300"
+                                                    placeholder="123"
+                                                    value={cardForm.cvv}
+                                                    onChangeText={(text) => 
+                                                        setCardForm(prev => ({ ...prev, cvv: text }))
+                                                    }
+                                                    keyboardType="numeric"
+                                                    maxLength={4}
+                                                    secureTextEntry
+                                                    placeholderTextColor="#888"
+                                                />
+                                            </View>
+                                        </View>
+                                    </View>
+
+                                    <TouchableOpacity
+                                        onPress={handleCardPayment}
+                                        disabled={isProcessingCard}
+                                        style={{
+                                            backgroundColor: '#FE8C00',
+                                            borderRadius: 25,
+                                            paddingVertical: 16,
+                                            alignItems: 'center',
+                                            marginBottom: 15,
+                                        }}
+                                    >
+                                        {isProcessingCard ? (
+                                            <ActivityIndicator color="white" />
+                                        ) : (
+                                            <Text className="base-bold text-white">
+                                                Confirm Payment
+                                            </Text>
+                                        )}
+                                    </TouchableOpacity>
+
+                                    {/* Alternative Payment Options */}
+                                    {onSwitchPaymentMethod && (
+                                        <View>
+                                            <Text className="base-bold text-dark-100 mb-3 text-center">
+                                                Or pay with other methods:
+                                            </Text>
+                                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                                                <TouchableOpacity
+                                                    onPress={() => onSwitchPaymentMethod('qr')}
+                                                    style={{
+                                                        flex: 1,
+                                                        backgroundColor: '#005BAA',
+                                                        borderRadius: 15,
+                                                        padding: 15,
+                                                        alignItems: 'center',
+                                                    }}
+                                                >
+                                                    <Text className="base-bold text-white">
+                                                        🏦 Pay by QR
+                                                    </Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    onPress={() => onSwitchPaymentMethod('cod')}
+                                                    style={{
+                                                        flex: 1,
+                                                        backgroundColor: '#2F9B65',
+                                                        borderRadius: 15,
+                                                        padding: 15,
+                                                        alignItems: 'center',
+                                                    }}
+                                                >
+                                                    <Text className="base-bold text-white">
+                                                        💵 Pay on Delivery
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    )}
+                                </View>
+                            )}
+                        </View>
+                    )}
+
                     {/* Footer Note */}
                     <View
                         style={{
@@ -405,6 +754,47 @@ const OrderInvoice = ({ visible, onClose, order }: OrderInvoiceProps) => {
                             Liên hệ hỗ trợ: support@fastfood.com
                         </Text>
                     </View>
+
+                    {/* Cancel Order Button - Only for pending orders from QR or Card */}
+                    {onCancel && (order.payment_status === 'pending' || order.payment_status === 'failed') && 
+                     (order.payment_method === 'bidv' || order.payment_method === 'card') && (
+                        <TouchableOpacity
+                            onPress={() => {
+                                Alert.alert(
+                                    'Cancel Order?',
+                                    'Are you sure you want to cancel this order? This action cannot be undone.',
+                                    [
+                                        {
+                                            text: 'No',
+                                            style: 'cancel',
+                                        },
+                                        {
+                                            text: 'Yes, Cancel',
+                                            style: 'destructive',
+                                            onPress: () => {
+                                                onCancel();
+                                                if (onRefresh) {
+                                                    onRefresh();
+                                                }
+                                                handleClose();
+                                            },
+                                        },
+                                    ]
+                                );
+                            }}
+                            style={{
+                                backgroundColor: '#F14141',
+                                borderRadius: 15,
+                                padding: 16,
+                                alignItems: 'center',
+                                marginTop: 20,
+                            }}
+                        >
+                            <Text className="base-bold text-white">
+                                ❌ Cancel Order
+                            </Text>
+                        </TouchableOpacity>
+                    )}
                 </ScrollView>
             </Animated.View>
         </Modal>

@@ -9,6 +9,7 @@ export interface MenuItem extends Models.Document {
     protein: number;
     rating: number;
     type: string;
+    tabs?: string; // Combo tabs (format: "1,2" for multiple combos, or "1" for single combo)
 }
 
 export interface Category extends Models.Document {
@@ -88,6 +89,7 @@ interface CustomButtonProps {
 
 interface CustomHeaderProps {
     title?: string;
+    onBack?: () => void;
 }
 
 interface CustomInputProps {
@@ -119,6 +121,7 @@ interface SignInParams {
 interface GetMenuParams {
     category: string;
     query: string;
+    tabs?: string; // Combo tab ID (1, 2, 3, or 4)
 }
 
 // type.d.ts - Thêm vào file type.d.ts hiện có

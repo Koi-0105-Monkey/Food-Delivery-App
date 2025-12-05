@@ -74,6 +74,7 @@ const dummyData = {
             calories: 550,
             protein: 25,
             category_name: "Burgers",
+            tabs: "1,2", // SUMMER COMBO (1) and BURGER BASH (2)
             customizations: ["Extra Cheese", "Coca Cola", "French Fries", "Onions", "Bacon"],
         },
         {
@@ -86,6 +87,7 @@ const dummyData = {
             calories: 700,
             protein: 30,
             category_name: "Pizzas",
+            tabs: "3", // PIZZA PARTY (3)
             customizations: ["Extra Cheese", "Jalapeño", "Garlic Bread", "Coca Cola", "Olives"],
         },
         {
@@ -98,6 +100,7 @@ const dummyData = {
             calories: 480,
             protein: 18,
             category_name: "Burritos",
+            tabs: "4", // BURRITO DELIGHT (4)
             customizations: ["Jalapeño", "Lemon Iced Tea", "French Fries", "Salad"],
         },
         {
@@ -110,6 +113,7 @@ const dummyData = {
             calories: 650,
             protein: 29,
             category_name: "Burgers",
+            tabs: "1,2", // SUMMER COMBO (1) and BURGER BASH (2)
             customizations: ["Onions", "French Fries", "Coca Cola", "Bacon", "Avocado"],
         },
         {
@@ -122,6 +126,7 @@ const dummyData = {
             calories: 490,
             protein: 28,
             category_name: "Wraps",
+            tabs: "", // Not in any combo
             customizations: ["Extra Cheese", "Coca Cola", "Potato Chips", "Tomatoes"],
         },
         {
@@ -134,6 +139,7 @@ const dummyData = {
             calories: 420,
             protein: 19,
             category_name: "Sandwiches",
+            tabs: "", // Not in any combo
             customizations: ["Mushrooms", "Olives", "Cheese Sticks", "Lemon Iced Tea"],
         },
         {
@@ -146,6 +152,7 @@ const dummyData = {
             calories: 720,
             protein: 35,
             category_name: "Burgers",
+            tabs: "2", // BURGER BASH (2)
             customizations: ["Extra Cheese", "Onions", "French Fries", "Coca Cola", "Chicken Bites"],
         },
         {
@@ -158,6 +165,7 @@ const dummyData = {
             calories: 470,
             protein: 20,
             category_name: "Wraps",
+            tabs: "", // Not in any combo
             customizations: ["Jalapeño", "Tomatoes", "Salad", "French Fries", "Lemon Iced Tea"],
         },
         {
@@ -170,6 +178,7 @@ const dummyData = {
             calories: 610,
             protein: 24,
             category_name: "Bowls",
+            tabs: "", // Not in any combo
             customizations: ["Avocado", "Sweet Corn", "Salad", "Lemon Iced Tea"],
         },
         {
@@ -182,6 +191,7 @@ const dummyData = {
             calories: 540,
             protein: 26,
             category_name: "Sandwiches",
+            tabs: "", // Not in any combo
             customizations: ["Jalapeño", "Onions", "French Fries", "Coca Cola", "Chocolate Lava Cake"],
         },
         {
@@ -194,6 +204,7 @@ const dummyData = {
             calories: 590,
             protein: 21,
             category_name: "Pizzas",
+            tabs: "3", // PIZZA PARTY (3)
             customizations: ["Extra Cheese", "Olives", "Coca Cola", "Garlic Bread"],
         },
         {
@@ -206,6 +217,7 @@ const dummyData = {
             calories: 580,
             protein: 38,
             category_name: "Bowls",
+            tabs: "", // Not in any combo
             customizations: ["Avocado", "Salad", "Sweet Corn", "Lemon Iced Tea"],
         },
         {
@@ -218,6 +230,7 @@ const dummyData = {
             calories: 510,
             protein: 22,
             category_name: "Burritos",
+            tabs: "4", // BURRITO DELIGHT (4)
             customizations: ["Jalapeño", "French Fries", "Garlic Bread", "Coca Cola"],
         },
         {
@@ -230,7 +243,126 @@ const dummyData = {
             calories: 610,
             protein: 31,
             category_name: "Sandwiches",
+            tabs: "", // Not in any combo
             customizations: ["Bacon", "Tomatoes", "Cheese Sticks", "Lemon Iced Tea"],
+        },
+        // Additional items for combos
+        {
+            name: "Summer Special Burger",
+            description: "Fresh beef patty with summer vegetables and special sauce",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/044/844/600/large_2x/homemade-fresh-tasty-burger-with-meat-and-cheese-classic-cheese-burger-and-vegetable-ai-generated-free-png.png",
+            price: 52000,
+            rating: 4.6,
+            calories: 580,
+            protein: 27,
+            category_name: "Burgers",
+            tabs: "1", // SUMMER COMBO (1)
+            customizations: ["Extra Cheese", "Tomatoes", "French Fries", "Coca Cola", "Avocado"],
+        },
+        {
+            name: "Crispy Chicken Burger",
+            description: "Crispy fried chicken with coleslaw and mayo",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/060/236/245/large_2x/a-large-hamburger-with-cheese-onions-and-lettuce-free-png.png",
+            price: 48000,
+            rating: 4.7,
+            calories: 620,
+            protein: 28,
+            category_name: "Burgers",
+            tabs: "2", // BURGER BASH (2)
+            customizations: ["Extra Cheese", "Onions", "French Fries", "Coca Cola"],
+        },
+        {
+            name: "Veggie Delight Burger",
+            description: "Grilled vegetables patty with special sauce",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/044/844/600/large_2x/homemade-fresh-tasty-burger-with-meat-and-cheese-classic-cheese-burger-and-vegetable-ai-generated-free-png.png",
+            price: 44000,
+            rating: 4.4,
+            calories: 450,
+            protein: 18,
+            category_name: "Burgers",
+            tabs: "1", // SUMMER COMBO (1)
+            customizations: ["Mushrooms", "Tomatoes", "Salad", "Lemon Iced Tea"],
+        },
+        {
+            name: "BBQ Chicken Pizza",
+            description: "BBQ sauce, grilled chicken, red onions, mozzarella",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/023/742/417/large_2x/pepperoni-pizza-isolated-illustration-ai-generative-free-png.png",
+            price: 95000,
+            rating: 4.8,
+            calories: 750,
+            protein: 32,
+            category_name: "Pizzas",
+            tabs: "3", // PIZZA PARTY (3)
+            customizations: ["Extra Cheese", "Jalapeño", "Garlic Bread", "Coca Cola"],
+        },
+        {
+            name: "Hawaiian Pizza",
+            description: "Ham, pineapple, mozzarella cheese",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/023/742/417/large_2x/pepperoni-pizza-isolated-illustration-ai-generative-free-png.png",
+            price: 88000,
+            rating: 4.5,
+            calories: 680,
+            protein: 28,
+            category_name: "Pizzas",
+            tabs: "3", // PIZZA PARTY (3)
+            customizations: ["Extra Cheese", "Olives", "Garlic Bread", "Coca Cola"],
+        },
+        {
+            name: "Supreme Pizza",
+            description: "Pepperoni, sausage, peppers, onions, mushrooms",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/023/742/417/large_2x/pepperoni-pizza-isolated-illustration-ai-generative-free-png.png",
+            price: 102000,
+            rating: 4.9,
+            calories: 820,
+            protein: 35,
+            category_name: "Pizzas",
+            tabs: "3", // PIZZA PARTY (3)
+            customizations: ["Extra Cheese", "Jalapeño", "Garlic Bread", "Coca Cola"],
+        },
+        {
+            name: "Chicken Burrito",
+            description: "Grilled chicken, rice, beans, cheese, salsa",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/055/133/581/large_2x/deliciously-grilled-burritos-filled-with-beans-corn-and-fresh-vegetables-served-with-lime-wedge-and-cilantro-isolated-on-transparent-background-free-png.png",
+            price: 55000,
+            rating: 4.6,
+            calories: 620,
+            protein: 30,
+            category_name: "Burritos",
+            tabs: "4", // BURRITO DELIGHT (4)
+            customizations: ["Extra Cheese", "Jalapeño", "French Fries", "Coca Cola", "Avocado"],
+        },
+        {
+            name: "Beef Burrito",
+            description: "Seasoned beef, rice, beans, cheese, sour cream",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/055/133/581/large_2x/deliciously-grilled-burritos-filled-with-beans-corn-and-fresh-vegetables-served-with-lime-wedge-and-cilantro-isolated-on-transparent-background-free-png.png",
+            price: 62000,
+            rating: 4.7,
+            calories: 680,
+            protein: 32,
+            category_name: "Burritos",
+            tabs: "4", // BURRITO DELIGHT (4)
+            customizations: ["Extra Cheese", "Jalapeño", "French Fries", "Coca Cola"],
+        },
+        {
+            name: "Veggie Burrito",
+            description: "Mixed vegetables, rice, beans, cheese",
+            image_url:
+                "https://static.vecteezy.com/system/resources/previews/055/133/581/large_2x/deliciously-grilled-burritos-filled-with-beans-corn-and-fresh-vegetables-served-with-lime-wedge-and-cilantro-isolated-on-transparent-background-free-png.png",
+            price: 46000,
+            rating: 4.3,
+            calories: 520,
+            protein: 20,
+            category_name: "Burritos",
+            tabs: "4", // BURRITO DELIGHT (4)
+            customizations: ["Extra Cheese", "Avocado", "Salad", "Lemon Iced Tea"],
         },
     ],
 };
@@ -399,6 +531,7 @@ async function seed() {
                     calories: item.calories,
                     protein: item.protein,
                     categories: categoryMap[item.category_name],
+                    tabs: item.tabs || "", // Add tabs field (string format: "1,2" for multiple combos)
                 }
             );
 

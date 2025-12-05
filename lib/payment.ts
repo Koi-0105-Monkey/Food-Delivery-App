@@ -201,3 +201,25 @@ export async function updatePaymentStatus(
         throw new Error(error.message || 'Unable to update payment status');
     }
 }
+
+/**
+ * Cancel order
+ */
+export async function cancelOrder(orderId: string): Promise<void> {
+    try {
+        await databases.updateDocument(
+            appwriteConfig.databaseId,
+            ORDERS_COLLECTION_ID,
+            orderId,
+            {
+                payment_status: 'cancelled',
+                order_status: 'cancelled',
+            }
+        );
+        
+        console.log(`✅ Order cancelled: ${orderId}`);
+    } catch (error: any) {
+        console.error('❌ Cancel order error:', error);
+        throw new Error(error.message || 'Unable to cancel order');
+    }
+}

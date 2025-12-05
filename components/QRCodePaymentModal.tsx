@@ -23,6 +23,10 @@ interface QRCodePaymentModalProps {
     totalAmount: number;
     orderNumber: string;
     orderId: string;
+    onCancelToPending?: () => void;
+    onRefresh?: () => void;
+    onSwitchToCard?: () => void;
+    onSwitchToCOD?: () => void;
 }
 
 const QRCodePaymentModal = ({ 
@@ -32,16 +36,26 @@ const QRCodePaymentModal = ({
     totalAmount,
     orderNumber,
     orderId,
+    onCancelToPending,
+    onRefresh,
+    onSwitchToCard,
+    onSwitchToCOD,
 }: QRCodePaymentModalProps) => {
     const slideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
     
     const [isLoading, setIsLoading] = useState(false);
     const [paymentData, setPaymentData] = useState<any>(null);
+    const [timeRemaining, setTimeRemaining] = useState(180); // 60 attempts × 3s = 180 seconds countdown
+    const [isPolling, setIsPolling] = useState(false);
+    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (visible) {
             setPaymentData(null);
+            setTimeRemaining(60);
+            setIsPolling(false);
             
             Animated.parallel([
                 Animated.spring(slideAnim, {
@@ -59,6 +73,15 @@ const QRCodePaymentModal = ({
 
             initQRPayment();
         } else {
+            // Cleanup intervals
+            if (pollingIntervalRef.current) {
+                clearInterval(pollingIntervalRef.current);
+                pollingIntervalRef.current = null;
+            }
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+                countdownIntervalRef.current = null;
+            }
             slideAnim.setValue(Dimensions.get('window').height);
             opacityAnim.setValue(0);
         }
@@ -87,10 +110,34 @@ const QRCodePaymentModal = ({
     };
 
     const startPolling = async () => {
+        setIsPolling(true);
+        setTimeRemaining(180); // 60 attempts × 3s = 180 seconds
+        
+        // Start countdown timer
+        countdownIntervalRef.current = setInterval(() => {
+            setTimeRemaining((prev) => {
+                if (prev <= 1) {
+                    if (countdownIntervalRef.current) {
+                        clearInterval(countdownIntervalRef.current);
+                        countdownIntervalRef.current = null;
+                    }
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
         try {
             const success = await pollPaymentStatus(orderId, 60);
 
+            // Cleanup countdown
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+                countdownIntervalRef.current = null;
+            }
+
             if (success) {
+                setIsPolling(false);
                 Alert.alert(
                     'Payment successful! 🎉',
                     'Your order has been confirmed!'
@@ -98,31 +145,87 @@ const QRCodePaymentModal = ({
                 onPaymentSuccess();
                 handleClose();
             } else {
-                Alert.alert(
-                    'Timeout expired',
-                    'Please check your order in the Profile section.'
-                );
+                setIsPolling(false);
+                // Auto-close after 1 second with notification
+                setTimeout(() => {
+                    Alert.alert(
+                        'Time is up ⏰',
+                        'Payment time has expired. Your order has been saved as pending. Please clear your cart to continue shopping.',
+                        [
+                            {
+                                text: 'OK',
+                                onPress: () => {
+                                    if (onCancelToPending) {
+                                        onCancelToPending();
+                                    }
+                                    handleClose();
+                                },
+                            },
+                        ]
+                    );
+                }, 1000);
             }
         } catch (error) {
             console.error('Polling error:', error);
+            setIsPolling(false);
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+                countdownIntervalRef.current = null;
+            }
         }
     };
 
     const handleClose = () => {
-        Animated.parallel([
-            Animated.timing(slideAnim, {
-                toValue: Dimensions.get('window').height,
-                duration: 300,
-                useNativeDriver: true,
-            }),
-            Animated.timing(opacityAnim, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-            }),
-        ]).start(() => {
-            onClose();
-        });
+        // Cleanup intervals
+        if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+        }
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+        }
+
+        Alert.alert(
+            'Cancel Payment?',
+            'Your order will be saved as pending. Please clear your cart to continue shopping.',
+            [
+                {
+                    text: 'Continue',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Cancel',
+                    style: 'destructive',
+                    onPress: () => {
+                        // Call callback to handle pending state
+                        if (onCancelToPending) {
+                            onCancelToPending();
+                        }
+
+                        // Refresh orders list
+                        if (onRefresh) {
+                            onRefresh();
+                        }
+
+                        Animated.parallel([
+                            Animated.timing(slideAnim, {
+                                toValue: Dimensions.get('window').height,
+                                duration: 300,
+                                useNativeDriver: true,
+                            }),
+                            Animated.timing(opacityAnim, {
+                                toValue: 0,
+                                duration: 300,
+                                useNativeDriver: true,
+                            }),
+                        ]).start(() => {
+                            onClose();
+                        });
+                    },
+                },
+            ]
+        );
     };
 
     if (!visible) return null;
@@ -329,7 +432,60 @@ const QRCodePaymentModal = ({
                             </View>
                         </View>
 
-                        {/* Loading Animation */}
+                        {/* Alternative Payment Options */}
+                        {isPolling && (
+                            <View style={{ marginBottom: 20 }}>
+                                <Text className="base-bold text-dark-100 mb-3 text-center">
+                                    Or pay with other methods:
+                                </Text>
+                                <View style={{ flexDirection: 'row', gap: 10 }}>
+                                    {onSwitchToCard && (
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                handleClose();
+                                                setTimeout(() => {
+                                                    onSwitchToCard();
+                                                }, 300);
+                                            }}
+                                            style={{
+                                                flex: 1,
+                                                backgroundColor: '#FE8C00',
+                                                borderRadius: 15,
+                                                padding: 15,
+                                                alignItems: 'center',
+                                            }}
+                                        >
+                                            <Text className="base-bold text-white">
+                                                💳 Pay by Card
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    {onSwitchToCOD && (
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                handleClose();
+                                                setTimeout(() => {
+                                                    onSwitchToCOD();
+                                                }, 300);
+                                            }}
+                                            style={{
+                                                flex: 1,
+                                                backgroundColor: '#2F9B65',
+                                                borderRadius: 15,
+                                                padding: 15,
+                                                alignItems: 'center',
+                                            }}
+                                        >
+                                            <Text className="base-bold text-white">
+                                                💵 Pay on Delivery
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Loading Animation with Countdown */}
                         <View className="flex-center mt-10 mb-20">
                             <ActivityIndicator size="large" color="#005BAA" />
                             <Text className="paragraph-medium text-gray-200 mt-4 text-center">
@@ -338,6 +494,30 @@ const QRCodePaymentModal = ({
                                     (Will automatically update once your transfer is detected)
                                 </Text>
                             </Text>
+                            {isPolling && (
+                                <View
+                                    style={{
+                                        marginTop: 20,
+                                        backgroundColor: '#FFF5E6',
+                                        borderRadius: 15,
+                                        padding: 15,
+                                        alignItems: 'center',
+                                    }}
+                                >
+                                    <Text className="base-bold text-dark-100 mb-2">
+                                        ⏰ Time Remaining
+                                    </Text>
+                                    <Text 
+                                        className="h2-bold text-primary"
+                                        style={{ fontSize: 32 }}
+                                    >
+                                        {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
+                                    </Text>
+                                    <Text className="body-regular text-gray-200 mt-2">
+                                        Payment will expire automatically
+                                    </Text>
+                                </View>
+                            )}
                         </View>
                     </ScrollView>
                 ) : null}

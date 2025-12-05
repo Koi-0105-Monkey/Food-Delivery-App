@@ -1,4 +1,4 @@
-// components/CardPaymentModal.tsx
+// components/CardPaymentModal.tsx - WITH CANCEL HANDLING
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -26,9 +26,12 @@ export interface CardPaymentData {
 interface CardPaymentModalProps {
     visible: boolean;
     onClose: () => void;
-    onConfirmPayment: (cardData: CardPaymentData) => Promise<void>; // ✅ Chỉ async
+    onConfirmPayment: (cardData: CardPaymentData) => Promise<void>;
     totalAmount: number;
     orderNumber: string;
+    orderId?: string;
+    onCancelToPending?: () => void;
+    onRefresh?: () => void;
 }
 
 const CardPaymentModal = ({ 
@@ -36,7 +39,10 @@ const CardPaymentModal = ({
     onClose, 
     onConfirmPayment,
     totalAmount,
-    orderNumber 
+    orderNumber,
+    orderId,
+    onCancelToPending,
+    onRefresh
 }: CardPaymentModalProps) => {
     const slideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -78,21 +84,56 @@ const CardPaymentModal = ({
         }
     }, [visible]);
 
+    // ✅ Handle Cancel with confirmation
     const handleClose = () => {
-        Animated.parallel([
-            Animated.timing(slideAnim, {
-                toValue: Dimensions.get('window').height,
-                duration: 300,
-                useNativeDriver: true,
-            }),
-            Animated.timing(opacityAnim, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-            }),
-        ]).start(() => {
-            onClose();
-        });
+        Alert.alert(
+            'Cancel Payment?',
+            'Your order will be saved as pending. Please clear your cart to continue shopping.',
+            [
+                {
+                    text: 'Continue',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Cancel',
+                    style: 'destructive',
+                    onPress: () => {
+                        // ✅ Log cancellation to terminal
+                        console.log('⚠️ ========== PAYMENT CANCELLED ==========');
+                        console.log('📦 Order:', orderNumber);
+                        console.log('💰 Amount:', totalAmount.toLocaleString('vi-VN') + 'đ');
+                        console.log('🔄 Status: Moved to Pending Orders');
+                        console.log('==========================================');
+
+                        // Call callback to handle pending state
+                        if (onCancelToPending) {
+                            onCancelToPending();
+                        }
+
+                        // Refresh orders list
+                        if (onRefresh) {
+                            onRefresh();
+                        }
+
+                        // Close modal with animation
+                        Animated.parallel([
+                            Animated.timing(slideAnim, {
+                                toValue: Dimensions.get('window').height,
+                                duration: 300,
+                                useNativeDriver: true,
+                            }),
+                            Animated.timing(opacityAnim, {
+                                toValue: 0,
+                                duration: 300,
+                                useNativeDriver: true,
+                            }),
+                        ]).start(() => {
+                            onClose();
+                        });
+                    },
+                },
+            ]
+        );
     };
 
     const formatCardNumber = (text: string) => {
@@ -114,19 +155,19 @@ const CardPaymentModal = ({
         const cardNumber = form.cardNumber.replace(/\s/g, '');
         
         if (cardNumber.length < 13 || cardNumber.length > 19) {
-            return Alert.alert('Lỗi', 'Số thẻ không hợp lệ');
+            return Alert.alert('Error', 'Invalid card number');
         }
 
         if (!form.cardHolder.trim()) {
-            return Alert.alert('Lỗi', 'Vui lòng nhập tên chủ thẻ');
+            return Alert.alert('Error', 'Please enter card holder name');
         }
 
         if (!form.expiryDate.match(/^\d{2}\/\d{2}$/)) {
-            return Alert.alert('Lỗi', 'Ngày hết hạn không hợp lệ (MM/YY)');
+            return Alert.alert('Error', 'Invalid expiry date (MM/YY)');
         }
 
         if (form.cvv.length < 3) {
-            return Alert.alert('Lỗi', 'CVV không hợp lệ');
+            return Alert.alert('Error', 'Invalid CVV');
         }
 
         setIsProcessing(true);
@@ -142,7 +183,7 @@ const CardPaymentModal = ({
 
     return (
         <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={handleClose}>
+            <View style={{ flex: 1 }}>
                 <Animated.View
                     style={{
                         flex: 1,
@@ -150,7 +191,7 @@ const CardPaymentModal = ({
                         opacity: opacityAnim,
                     }}
                 />
-            </TouchableOpacity>
+            </View>
 
             <Animated.View
                 style={{
@@ -184,9 +225,9 @@ const CardPaymentModal = ({
                         }}
                     >
                         <View>
-                            <Text className="h3-bold text-dark-100">Thanh toán thẻ</Text>
+                            <Text className="h3-bold text-dark-100">Card Payment</Text>
                             <Text className="body-regular text-gray-200 mt-1">
-                                Đơn hàng: {orderNumber}
+                                Order: {orderNumber}
                             </Text>
                         </View>
                         <TouchableOpacity onPress={handleClose}>
@@ -208,7 +249,7 @@ const CardPaymentModal = ({
                             alignItems: 'center',
                         }}
                     >
-                        <Text className="body-medium text-gray-200 mb-2">Số tiền thanh toán</Text>
+                        <Text className="body-medium text-gray-200 mb-2">Payment Amount</Text>
                         <Text className="h1-bold text-primary" style={{ fontSize: 36 }}>
                             {totalAmount.toLocaleString('vi-VN')}đ
                         </Text>
@@ -218,7 +259,7 @@ const CardPaymentModal = ({
                     <View style={{ gap: 20 }}>
                         {/* Card Number */}
                         <View>
-                            <Text className="label">Số thẻ *</Text>
+                            <Text className="label">Card Number *</Text>
                             <TextInput
                                 className="input border-gray-300"
                                 placeholder="1234 5678 9012 3456"
@@ -234,10 +275,10 @@ const CardPaymentModal = ({
 
                         {/* Card Holder */}
                         <View>
-                            <Text className="label">Tên chủ thẻ *</Text>
+                            <Text className="label">Card Holder Name *</Text>
                             <TextInput
                                 className="input border-gray-300"
-                                placeholder="NGUYEN VAN A"
+                                placeholder="JOHN DOE"
                                 value={form.cardHolder}
                                 onChangeText={(text) => 
                                     setForm(prev => ({ ...prev, cardHolder: text.toUpperCase() }))
@@ -250,7 +291,7 @@ const CardPaymentModal = ({
                         {/* Expiry & CVV */}
                         <View style={{ flexDirection: 'row', gap: 15 }}>
                             <View style={{ flex: 1 }}>
-                                <Text className="label">Ngày hết hạn *</Text>
+                                <Text className="label">Expiry Date *</Text>
                                 <TextInput
                                     className="input border-gray-300"
                                     placeholder="MM/YY"
@@ -301,7 +342,7 @@ const CardPaymentModal = ({
                             tintColor="#2F9B65"
                         />
                         <Text className="body-regular text-gray-200" style={{ flex: 1 }}>
-                            Thông tin thẻ được mã hóa và bảo mật
+                            Your card information is encrypted and secure
                         </Text>
                     </View>
 
@@ -321,7 +362,7 @@ const CardPaymentModal = ({
                             <ActivityIndicator color="white" />
                         ) : (
                             <Text className="base-bold text-white">
-                                Xác nhận thanh toán
+                                Confirm Payment
                             </Text>
                         )}
                     </TouchableOpacity>
@@ -339,7 +380,7 @@ const CardPaymentModal = ({
                             marginTop: 12,
                         }}
                     >
-                        <Text className="base-bold text-gray-200">Hủy</Text>
+                        <Text className="base-bold text-gray-200">Cancel</Text>
                     </TouchableOpacity>
                 </ScrollView>
             </Animated.View>
