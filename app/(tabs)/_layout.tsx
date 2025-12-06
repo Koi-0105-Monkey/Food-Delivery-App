@@ -34,11 +34,11 @@ export default function TabLayout() {
 
     // Redirect to sign-in if not authenticated
     if (!isAuthenticated) {
-        console.log('🔒 User not authenticated, redirecting to sign-in');
+        console.log('→ Redirecting to sign-in (no active session)');
         return <Redirect href="/sign-in" />;
     }
 
-    console.log('✅ User authenticated, showing tabs');
+    console.log('✓ Showing app tabs');
 
     return (
         <Tabs

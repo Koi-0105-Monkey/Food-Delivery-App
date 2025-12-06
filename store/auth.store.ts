@@ -42,7 +42,8 @@ const useAuthStore = create<AuthState>((set) => ({
                     user: null,
                     isLoading: false 
                 });
-                console.log('❌ No user session found');
+                // ✅ FIX: Less noisy logging - no session is normal on first load
+                console.log('ℹ️  No active session');
             }
         } catch (e) {
             console.error('❌ fetchAuthenticatedUser error:', e);
