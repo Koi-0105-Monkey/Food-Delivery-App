@@ -176,7 +176,6 @@ export const getCurrentUser = async () => {
         const currentAccount = await account.get();
 
         if (!currentAccount) {
-            console.log('❌ No account found');
             return null;
         }
 
@@ -190,18 +189,22 @@ export const getCurrentUser = async () => {
         );
 
         if (!currentUser || currentUser.documents.length === 0) {
-            console.log('❌ User document not found');
+            console.log('⚠️ User document not found for account:', currentAccount.$id);
             return null;
         }
 
         console.log('✅ User document found:', currentUser.documents[0].email);
         return currentUser.documents[0];
     } catch (error: any) {
-        console.error('❌ Get current user error:', error.message);
-        
-        // If session expired or invalid, return null (not an error)
-        if (error.code === 401 || error.message?.includes('session') || error.message?.includes('guests')) {
+        // ✅ FIX: Don't log error if user is just not authenticated (guests role)
+        if (error.code === 401 || error.message?.includes('guests')) {
+            // Silent fail - no session is not an error, it's expected
             return null;
+        }
+        
+        // Only log unexpected errors
+        if (error.message && !error.message.includes('session')) {
+            console.error('❌ Get current user error:', error.message);
         }
 
         return null;
@@ -273,7 +276,7 @@ export const getUserAddress = async (userId: string) => {
     }
 };
 
-// ========== CART FUNCTIONS ==========
+// ========== CART FUNCTIONS (LEGACY - FOR BACKWARD COMPATIBILITY) ==========
 export const syncCartToServerLegacy = async (userId: string, cartItems: any[]) => {
     try {
         // Delete all existing cart items for this user
@@ -382,26 +385,26 @@ export const updateUserProfile = async ({
         if (avatarUri.startsWith('file://')) {
             console.log('📤 Uploading new avatar...');
             
-            const response = await fetch(avatarUri);
-            const blob = await response.blob();
-            
             // Create unique file ID
             const fileId = ID.unique();
             
-            // Upload file using InputFile
-            const file = await storage.createFile(
+            // ✅ FIX: React Native Appwrite expects file object with specific structure
+            const file = {
+                name: `avatar-${userId}-${Date.now()}.jpg`,
+                type: 'image/jpeg',
+                size: 0, // Will be calculated automatically
+                uri: avatarUri,
+            };
+
+            // Upload file
+            const uploadedFile = await storage.createFile(
                 appwriteConfig.bucketId,
                 fileId,
-                {
-                    name: `avatar-${userId}-${Date.now()}.jpg`,
-                    type: 'image/jpeg',
-                    size: blob.size,
-                    uri: avatarUri,
-                }
+                file as any // Type assertion needed for RN Appwrite
             );
 
-            // 🔥 FIX: Get proper view URL with project parameter
-            finalAvatarUrl = `${appwriteConfig.endpoint}/storage/buckets/${appwriteConfig.bucketId}/files/${file.$id}/view?project=${appwriteConfig.projectId}`;
+            // Get proper view URL with project parameter
+            finalAvatarUrl = `${appwriteConfig.endpoint}/storage/buckets/${appwriteConfig.bucketId}/files/${uploadedFile.$id}/view?project=${appwriteConfig.projectId}`;
 
             console.log('✅ Avatar uploaded successfully:', finalAvatarUrl);
         }

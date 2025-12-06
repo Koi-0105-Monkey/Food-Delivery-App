@@ -1,4 +1,4 @@
-// app/product/[id].tsx - WITH TOAST & COMBO DISCOUNT
+// app/product/[id].tsx - WITH IMAGE GRID TOPPINGS & SIDES
 
 import { View, Text, Image, ScrollView, TouchableOpacity, Alert, Animated, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +13,39 @@ import { Query } from 'react-native-appwrite';
 import CustomButton from '@/components/CustomButton';
 import Toast from '@/components/Toast';
 import cn from 'clsx';
+
+// Helper function to get emoji for toppings
+const getEmojiForTopping = (name: string): string => {
+    const lowerName = name.toLowerCase();
+    
+    if (lowerName.includes('tomato')) return '🍅';
+    if (lowerName.includes('onion')) return '🧅';
+    if (lowerName.includes('cheese')) return '🧀';
+    if (lowerName.includes('bacon')) return '🥓';
+    if (lowerName.includes('mushroom')) return '🍄';
+    if (lowerName.includes('pickle')) return '🥒';
+    if (lowerName.includes('jalapeño') || lowerName.includes('jalapeno')) return '🌶️';
+    if (lowerName.includes('avocado')) return '🥑';
+    if (lowerName.includes('olive')) return '🫒';
+    
+    return '🍔'; // Default
+};
+
+// Helper function to get emoji for sides
+const getEmojiForSide = (name: string): string => {
+    const lowerName = name.toLowerCase();
+    
+    if (lowerName.includes('fries') || lowerName.includes('french')) return '🍟';
+    if (lowerName.includes('coleslaw')) return '🥗';
+    if (lowerName.includes('salad')) return '🥗';
+    if (lowerName.includes('pringles') || lowerName.includes('chips')) return '🥔';
+    if (lowerName.includes('mozz') || lowerName.includes('cheese stick')) return '🧀';
+    if (lowerName.includes('nugget') || lowerName.includes('chicken')) return '🍗';
+    if (lowerName.includes('corn')) return '🌽';
+    if (lowerName.includes('mushroom')) return '🍄';
+    
+    return '🍽️'; // Default
+};
 
 const ProductDetail = () => {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -93,7 +126,7 @@ const ProductDetail = () => {
         }
     };
 
-    // ✅ COMBO DISCOUNT LOGIC
+    // COMBO DISCOUNT LOGIC
     const getDiscountedPrice = () => {
         if (!product || !product.tabs || product.tabs.trim() === '') {
             return product?.price || 0;
@@ -143,7 +176,7 @@ const ProductDetail = () => {
     const calculateTotalPrice = () => {
         if (!product) return 0;
 
-        const basePrice = getDiscountedPrice(); // ✅ Use discounted price
+        const basePrice = getDiscountedPrice();
         const customizationPrice = selectedCustomizations.reduce(
             (sum, c) => sum + c.price,
             0
@@ -160,14 +193,14 @@ const ProductDetail = () => {
 
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-        const basePrice = getDiscountedPrice(); // ✅ Use discounted price
+        const basePrice = getDiscountedPrice();
 
         // Add item to cart multiple times based on quantity
         for (let i = 0; i < quantity; i++) {
             addItem({
                 id: product.$id,
                 name: product.name,
-                price: basePrice, // ✅ Use discounted price
+                price: basePrice,
                 image_url: product.image_url,
                 customizations: selectedCustomizations,
             });
@@ -310,13 +343,13 @@ const ProductDetail = () => {
                             </View>
                         </View>
 
-                        {/* Toppings */}
+                        {/* Toppings - Image Grid Style */}
                         {toppings.length > 0 && (
                             <View className="mb-6">
                                 <Text className="base-bold text-dark-100 mb-3">
-                                    Add Toppings
+                                    Toppings
                                 </Text>
-                                <View className="flex-row flex-wrap gap-2">
+                                <View className="flex-row flex-wrap gap-3">
                                     {toppings.map((topping: any) => {
                                         const isSelected = selectedCustomizations.some(
                                             c => c.id === topping.$id
@@ -326,20 +359,54 @@ const ProductDetail = () => {
                                             <TouchableOpacity
                                                 key={topping.$id}
                                                 onPress={() => handleCustomizationToggle(topping)}
-                                                className={cn(
-                                                    'px-4 py-2.5 rounded-full border',
-                                                    isSelected
-                                                        ? 'bg-primary border-primary'
-                                                        : 'bg-white border-gray-200'
-                                                )}
+                                                style={{
+                                                    width: 70,
+                                                    height: 90,
+                                                    position: 'relative',
+                                                }}
                                             >
-                                                <Text
-                                                    className={cn(
-                                                        'body-medium',
-                                                        isSelected ? 'text-white' : 'text-dark-100'
-                                                    )}
+                                                <View
+                                                    style={{
+                                                        width: 70,
+                                                        height: 70,
+                                                        borderRadius: 16,
+                                                        backgroundColor: isSelected ? '#FFF5E6' : '#F9FAFB',
+                                                        borderWidth: 2,
+                                                        borderColor: isSelected ? '#FE8C00' : '#E5E7EB',
+                                                        justifyContent: 'center',
+                                                        alignItems: 'center',
+                                                        marginBottom: 4,
+                                                    }}
                                                 >
-                                                    {topping.name} +{topping.price.toLocaleString('vi-VN')}đ
+                                                    <Text style={{ fontSize: 32 }}>
+                                                        {getEmojiForTopping(topping.name)}
+                                                    </Text>
+                                                    {isSelected && (
+                                                        <View
+                                                            style={{
+                                                                position: 'absolute',
+                                                                top: -8,
+                                                                right: -8,
+                                                                width: 24,
+                                                                height: 24,
+                                                                borderRadius: 12,
+                                                                backgroundColor: '#FE8C00',
+                                                                justifyContent: 'center',
+                                                                alignItems: 'center',
+                                                            }}
+                                                        >
+                                                            <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>
+                                                                ✓
+                                                            </Text>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                                <Text 
+                                                    className="small-bold text-dark-100 text-center"
+                                                    numberOfLines={1}
+                                                    style={{ fontSize: 11 }}
+                                                >
+                                                    {topping.name}
                                                 </Text>
                                             </TouchableOpacity>
                                         );
@@ -348,11 +415,11 @@ const ProductDetail = () => {
                             </View>
                         )}
 
-                        {/* Sides */}
+                        {/* Side Options - Image Grid Style */}
                         {sides.length > 0 && (
                             <View className="mb-6">
-                                <Text className="base-bold text-dark-100 mb-3">Add Sides</Text>
-                                <View className="flex-row flex-wrap gap-2">
+                                <Text className="base-bold text-dark-100 mb-3">Side options</Text>
+                                <View className="flex-row flex-wrap gap-3">
                                     {sides.map((side: any) => {
                                         const isSelected = selectedCustomizations.some(
                                             c => c.id === side.$id
@@ -362,20 +429,54 @@ const ProductDetail = () => {
                                             <TouchableOpacity
                                                 key={side.$id}
                                                 onPress={() => handleCustomizationToggle(side)}
-                                                className={cn(
-                                                    'px-4 py-2.5 rounded-full border',
-                                                    isSelected
-                                                        ? 'bg-primary border-primary'
-                                                        : 'bg-white border-gray-200'
-                                                )}
+                                                style={{
+                                                    width: 70,
+                                                    height: 90,
+                                                    position: 'relative',
+                                                }}
                                             >
-                                                <Text
-                                                    className={cn(
-                                                        'body-medium',
-                                                        isSelected ? 'text-white' : 'text-dark-100'
-                                                    )}
+                                                <View
+                                                    style={{
+                                                        width: 70,
+                                                        height: 70,
+                                                        borderRadius: 16,
+                                                        backgroundColor: isSelected ? '#FFF5E6' : '#F9FAFB',
+                                                        borderWidth: 2,
+                                                        borderColor: isSelected ? '#FE8C00' : '#E5E7EB',
+                                                        justifyContent: 'center',
+                                                        alignItems: 'center',
+                                                        marginBottom: 4,
+                                                    }}
                                                 >
-                                                    {side.name} +{side.price.toLocaleString('vi-VN')}đ
+                                                    <Text style={{ fontSize: 32 }}>
+                                                        {getEmojiForSide(side.name)}
+                                                    </Text>
+                                                    {isSelected && (
+                                                        <View
+                                                            style={{
+                                                                position: 'absolute',
+                                                                top: -8,
+                                                                right: -8,
+                                                                width: 24,
+                                                                height: 24,
+                                                                borderRadius: 12,
+                                                                backgroundColor: '#FE8C00',
+                                                                justifyContent: 'center',
+                                                                alignItems: 'center',
+                                                            }}
+                                                        >
+                                                            <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>
+                                                                ✓
+                                                            </Text>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                                <Text 
+                                                    className="small-bold text-dark-100 text-center"
+                                                    numberOfLines={1}
+                                                    style={{ fontSize: 11 }}
+                                                >
+                                                    {side.name}
                                                 </Text>
                                             </TouchableOpacity>
                                         );
