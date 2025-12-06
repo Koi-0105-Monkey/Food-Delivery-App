@@ -1,5 +1,6 @@
+// app/product/[id].tsx - WITH TOAST & COMBO DISCOUNT
 
-import { View, Text, Image, ScrollView, TouchableOpacity, Alert, Animated } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, Alert, Animated, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
@@ -92,6 +93,23 @@ const ProductDetail = () => {
         }
     };
 
+    // ✅ COMBO DISCOUNT LOGIC
+    const getDiscountedPrice = () => {
+        if (!product || !product.tabs || product.tabs.trim() === '') {
+            return product?.price || 0;
+        }
+
+        const comboIds = product.tabs.split(',').map(id => id.trim()).filter(Boolean);
+        
+        if (comboIds.length >= 2) {
+            return product.price * 0.8; // 20% discount
+        } else if (comboIds.length === 1) {
+            return product.price * 0.85; // 15% discount
+        }
+
+        return product.price;
+    };
+
     const handleQuantityChange = (type: 'increase' | 'decrease') => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         
@@ -125,7 +143,7 @@ const ProductDetail = () => {
     const calculateTotalPrice = () => {
         if (!product) return 0;
 
-        const basePrice = product.price;
+        const basePrice = getDiscountedPrice(); // ✅ Use discounted price
         const customizationPrice = selectedCustomizations.reduce(
             (sum, c) => sum + c.price,
             0
@@ -142,12 +160,14 @@ const ProductDetail = () => {
 
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
+        const basePrice = getDiscountedPrice(); // ✅ Use discounted price
+
         // Add item to cart multiple times based on quantity
         for (let i = 0; i < quantity; i++) {
             addItem({
                 id: product.$id,
                 name: product.name,
-                price: product.price,
+                price: basePrice, // ✅ Use discounted price
                 image_url: product.image_url,
                 customizations: selectedCustomizations,
             });
@@ -165,7 +185,8 @@ const ProductDetail = () => {
     if (loading) {
         return (
             <SafeAreaView className="bg-white h-full flex-center">
-                <Text className="paragraph-medium text-gray-200">Loading...</Text>
+                <ActivityIndicator size="large" color="#FE8C00" />
+                <Text className="paragraph-medium text-gray-200 mt-4">Loading...</Text>
             </SafeAreaView>
         );
     }
@@ -177,6 +198,12 @@ const ProductDetail = () => {
             </SafeAreaView>
         );
     }
+
+    // Calculate discount info
+    const basePrice = product.price;
+    const discountedPrice = getDiscountedPrice();
+    const hasDiscount = discountedPrice < basePrice;
+    const discountPercent = hasDiscount ? Math.round(((basePrice - discountedPrice) / basePrice) * 100) : 0;
 
     // Group customizations by type
     const toppings = availableCustomizations.filter(c => c.type === 'topping');
@@ -226,7 +253,34 @@ const ProductDetail = () => {
                             <View className="flex-row items-center justify-between">
                                 <View>
                                     <Text className="body-medium text-gray-200 mb-1">Price</Text>
-                                    <Text className="h1-bold text-primary">${product.price}</Text>
+                                    {hasDiscount ? (
+                                        <View>
+                                            <Text style={{ fontSize: 14, color: '#878787', textDecorationLine: 'line-through' }}>
+                                                {basePrice.toLocaleString('vi-VN')}đ
+                                            </Text>
+                                            <View className="flex-row items-center gap-2">
+                                                <Text className="h1-bold text-primary">
+                                                    {discountedPrice.toLocaleString('vi-VN')}đ
+                                                </Text>
+                                                <View
+                                                    style={{
+                                                        backgroundColor: '#F14141',
+                                                        borderRadius: 12,
+                                                        paddingHorizontal: 8,
+                                                        paddingVertical: 2,
+                                                    }}
+                                                >
+                                                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: 'white' }}>
+                                                        -{discountPercent}% OFF
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    ) : (
+                                        <Text className="h1-bold text-primary">
+                                            {basePrice.toLocaleString('vi-VN')}đ
+                                        </Text>
+                                    )}
                                 </View>
                                 <View className="flex-row items-center gap-4">
                                     <View className="items-center">
@@ -285,7 +339,7 @@ const ProductDetail = () => {
                                                         isSelected ? 'text-white' : 'text-dark-100'
                                                     )}
                                                 >
-                                                    {topping.name} +${topping.price}
+                                                    {topping.name} +{topping.price.toLocaleString('vi-VN')}đ
                                                 </Text>
                                             </TouchableOpacity>
                                         );
@@ -321,7 +375,7 @@ const ProductDetail = () => {
                                                         isSelected ? 'text-white' : 'text-dark-100'
                                                     )}
                                                 >
-                                                    {side.name} +${side.price}
+                                                    {side.name} +{side.price.toLocaleString('vi-VN')}đ
                                                 </Text>
                                             </TouchableOpacity>
                                         );
@@ -330,7 +384,7 @@ const ProductDetail = () => {
                             </View>
                         )}
 
-                        {/* ✅ FIX: Selected Customizations Summary - Đã thêm closing tag */}
+                        {/* Selected Customizations Summary */}
                         {selectedCustomizations.length > 0 && (
                             <View className="mb-6 bg-success/10 rounded-2xl p-4">
                                 <Text className="base-semibold text-dark-100 mb-2">
@@ -342,7 +396,7 @@ const ProductDetail = () => {
                                             • {custom.name}
                                         </Text>
                                         <Text className="body-medium text-success">
-                                            +${custom.price}
+                                            +{custom.price.toLocaleString('vi-VN')}đ
                                         </Text>
                                     </View>
                                 ))}
@@ -391,7 +445,7 @@ const ProductDetail = () => {
 
                 {/* Add to Cart Button */}
                 <CustomButton
-                    title={`Add to Cart - $${calculateTotalPrice().toFixed(2)}`}
+                    title={`Add to Cart - ${calculateTotalPrice().toLocaleString('vi-VN')}đ`}
                     onPress={handleAddToCart}
                 />
             </View>
