@@ -1,4 +1,4 @@
-// components/MenuCard.tsx - IMPROVED VERSION WITH TOAST
+// components/MenuCard.tsx - FIXED VERSION WITH TEXT TRUNCATION
 
 import { Text, TouchableOpacity, Image, Platform, View } from 'react-native';
 import { MenuItem } from '@/type';
@@ -45,21 +45,18 @@ const MenuCard = ({ item: { $id, image_url, name, price, rating, tabs } }: { ite
     // ✅ COMBO DISCOUNT LOGIC
     const getDiscountedPrice = () => {
         if (!tabs || tabs.trim() === '') {
-            return price; // No discount
+            return price;
         }
 
-        // Check how many combos this item belongs to
         const comboIds = tabs.split(',').map(id => id.trim()).filter(Boolean);
         
         if (comboIds.length >= 2) {
-            // Item is in 2+ combos → 20% discount
             return price * 0.8;
         } else if (comboIds.length === 1) {
-            // Item is in 1 combo → 15% discount
             return price * 0.85;
         }
 
-        return price; // No discount
+        return price;
     };
 
     const discountedPrice = getDiscountedPrice();
@@ -82,12 +79,18 @@ const MenuCard = ({ item: { $id, image_url, name, price, rating, tabs } }: { ite
         addItem({ 
             id: $id, 
             name, 
-            price: discountedPrice, // ✅ Use discounted price
+            price: discountedPrice,
             image_url, 
             customizations: [] 
         });
 
         showToastNotification(`✅ ${name} added to cart!`);
+    };
+
+    // ✅ FIX: Truncate long names
+    const truncateName = (text: string, maxLength: number = 25) => {
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength - 3) + '...';
     };
 
     return (
@@ -96,7 +99,7 @@ const MenuCard = ({ item: { $id, image_url, name, price, rating, tabs } }: { ite
             style={{
                 paddingVertical: 32,
                 paddingHorizontal: 14,
-                paddingTop: 96, // Space for image
+                paddingTop: 96,
                 backgroundColor: 'white',
                 borderRadius: 24,
                 shadowColor: '#878787',
@@ -104,7 +107,7 @@ const MenuCard = ({ item: { $id, image_url, name, price, rating, tabs } }: { ite
                 shadowOpacity: 0.1,
                 shadowRadius: 8,
                 ...(Platform.OS === 'android' && { elevation: 5 }),
-                minHeight: 260, // ✅ Fixed height for consistency
+                minHeight: 260,
             }}
             onPress={handleViewDetail}
             activeOpacity={0.7}
@@ -180,17 +183,15 @@ const MenuCard = ({ item: { $id, image_url, name, price, rating, tabs } }: { ite
                 </Text>
             </View>
 
-            {/* Product Name - ✅ Truncated with ellipsis */}
+            {/* ✅ FIX: Product Name - Truncated with custom function */}
             <Text
                 className="text-center base-bold text-dark-100 mb-2"
-                numberOfLines={2}
-                ellipsizeMode="tail"
                 style={{ 
-                    minHeight: 44, // ✅ Reserve space for 2 lines
+                    minHeight: 44,
                     lineHeight: 22,
                 }}
             >
-                {name}
+                {truncateName(name, 25)}
             </Text>
 
             {/* Price Section */}
