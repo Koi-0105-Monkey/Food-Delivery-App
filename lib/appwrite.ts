@@ -209,7 +209,7 @@ export const getCurrentUser = async () => {
 };
 
 // ========== MENU FUNCTIONS ==========
-export const getMenu = async ({ category, query }: GetMenuParams) => {
+export const getMenu = async ({ category, query, tabs }: GetMenuParams) => {
     try {
         const queries: string[] = [];
 
@@ -222,7 +222,18 @@ export const getMenu = async ({ category, query }: GetMenuParams) => {
             queries
         );
 
-        return menus.documents;
+        let results = menus.documents;
+
+        // Filter by tabs if provided - items that contain the tab ID in their tabs field
+        if (tabs) {
+            results = results.filter((item: any) => {
+                const itemTabs = item.tabs || '';
+                // Check if tabs field contains the requested tab ID
+                return itemTabs.includes(tabs);
+            });
+        }
+
+        return results;
     } catch (error: any) {
         console.error('Get menu error:', error);
         throw new Error(error.message || 'Failed to fetch menu');

@@ -9,6 +9,7 @@ export interface MenuItem extends Models.Document {
     protein: number;
     rating: number;
     type: string;
+    tabs?: string; // Combo tabs (format: "1,2" for multiple combos, or "1" for single combo)
 }
 
 export interface Category extends Models.Document {
@@ -88,6 +89,7 @@ interface CustomButtonProps {
 
 interface CustomHeaderProps {
     title?: string;
+    onBack?: () => void;
 }
 
 interface CustomInputProps {
@@ -119,11 +121,12 @@ interface SignInParams {
 interface GetMenuParams {
     category: string;
     query: string;
+    tabs?: string; // Combo tab ID (1, 2, 3, or 4)
 }
 
 // type.d.ts - Thêm vào file type.d.ts hiện có
 
-export type PaymentMethod = 'cod' | 'momo' | 'card';
+export type PaymentMethod = 'cod' | 'bidv' | 'card';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'cancelled';
 export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'delivering' | 'completed' | 'cancelled';
 
@@ -180,18 +183,6 @@ export interface CardPaymentData {
     cardHolder: string;
     expiryDate: string;  // ✅ Dùng format MM/YY (đơn giản hơn)
     cvv: string;
-}
-
-export interface CreateOrderParams {
-    items: OrderItem[];
-    subtotal: number;
-    delivery_fee: number;
-    discount: number;
-    total: number;
-    delivery_address: string;
-    delivery_phone: string;
-    delivery_notes?: string;
-    payment_method: PaymentMethod;
 }
 
 export interface QRCodeData {

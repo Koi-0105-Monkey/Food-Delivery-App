@@ -1,6 +1,9 @@
-import { View, Text, Image, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
+// app/(tabs)/profile.tsx - ENHANCED WITH PENDING & COMPLETED ORDERS
+
+import React, { useEffect, useState } from 'react';
+import { View, Text, Image, ScrollView, TouchableOpacity, Alert, Linking, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import useAuthStore from '@/store/auth.store';
 import { useAddressStore } from '@/store/address.store';
 import { images } from '@/constants';
@@ -10,6 +13,7 @@ import AddressListModal from '@/components/AddressListModal';
 import AddEditAddressModal from '@/components/AddEditAddressModal';
 import EditProfileModal from '@/components/EditProfileModal';
 import { Address } from '@/store/address.store';
+import { getUserOrders } from '@/lib/payment';
 
 const ProfileField = ({ label, value, icon }: { label: string; value: string; icon: any }) => (
     <View className="profile-field">
@@ -31,13 +35,56 @@ const Profile = () => {
     const [showAddEditModal, setShowAddEditModal] = useState(false);
     const [editingAddress, setEditingAddress] = useState<Address | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
+    
+    // ✅ Order History State - Check if has orders (for showing buttons)
+    const [hasPendingOrders, setHasPendingOrders] = useState(false);
+    const [hasCompletedOrders, setHasCompletedOrders] = useState(false);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-    // Load địa chỉ khi vào profile
     useEffect(() => {
         if (user) {
             fetchAddresses();
         }
     }, [user]);
+
+    // ✅ Refresh orders count when screen is focused
+    useFocusEffect(
+        React.useCallback(() => {
+            if (user) {
+                checkOrdersCount();
+            }
+        }, [user])
+    );
+
+    // ✅ Check orders count (silently, no logs)
+    const checkOrdersCount = async () => {
+        if (!user) return;
+        
+        try {
+            const userOrders = await getUserOrders(user.$id);
+            
+            // Split orders into pending and completed
+            const pending = userOrders.filter(order => 
+                order.payment_status === 'pending' || 
+                order.payment_status === 'failed'
+            );
+            
+            const completed = userOrders.filter(order => 
+                order.payment_status === 'paid'
+            );
+            
+            setHasPendingOrders(pending.length > 0);
+            setHasCompletedOrders(completed.length > 0);
+            
+            // Only log on initial app load
+            if (isInitialLoad) {
+                console.log(`✅ Loaded ${pending.length} pending, ${completed.length} completed orders`);
+                setIsInitialLoad(false);
+            }
+        } catch (error) {
+            console.error('Failed to check orders count:', error);
+        }
+    };
 
     const handleLogout = async () => {
         Alert.alert(
@@ -105,6 +152,11 @@ const Profile = () => {
             fetchAddresses();
             setShowAddressListModal(true);
         }, 300);
+    };
+
+    // ✅ Navigate to orders screen
+    const handleViewOrders = (type: 'pending' | 'completed') => {
+        router.push(`/orders?type=${type}`);
     };
 
     return (
@@ -242,24 +294,46 @@ const Profile = () => {
                         </TouchableOpacity>
                     )}
 
-                    {/* Order History */}
-                    <TouchableOpacity
-                        className="bg-white border border-gray-200 rounded-2xl p-5 flex-row items-center justify-between"
-                        onPress={() => Alert.alert('Coming Soon', 'Order history feature coming soon!')}
-                    >
-                        <View className="flex-row items-center gap-3">
-                            <View className="size-12 rounded-full bg-primary/10 flex-center">
-                                <Image
-                                    source={images.clock}
-                                    className="size-6"
-                                    resizeMode="contain"
-                                    tintColor="#FE8C00"
-                                />
-                            </View>
-                            <Text className="paragraph-semibold text-dark-100">Order History</Text>
+                    {/* ✅ Order History Buttons */}
+                    {(hasPendingOrders || hasCompletedOrders) && (
+                        <View className="mt-4">
+                            <Text className="base-bold text-dark-100 mb-4">📦 Order History</Text>
+                            
+                            {hasPendingOrders && (
+                                <TouchableOpacity
+                                    className="bg-white border border-gray-200 rounded-2xl p-5 flex-row items-center justify-between mb-3"
+                                    onPress={() => handleViewOrders('pending')}
+                                >
+                                    <View className="flex-row items-center gap-3">
+                                        <View className="size-12 rounded-full bg-primary/10 flex-center">
+                                            <Text className="text-2xl">⏳</Text>
+                                        </View>
+                                        <Text className="paragraph-semibold text-dark-100">
+                                            View Pending Orders
+                                        </Text>
+                                    </View>
+                                    <Image source={images.arrowRight} className="size-5" resizeMode="contain" />
+                                </TouchableOpacity>
+                            )}
+
+                            {hasCompletedOrders && (
+                                <TouchableOpacity
+                                    className="bg-white border border-gray-200 rounded-2xl p-5 flex-row items-center justify-between"
+                                    onPress={() => handleViewOrders('completed')}
+                                >
+                                    <View className="flex-row items-center gap-3">
+                                        <View className="size-12 rounded-full bg-success/10 flex-center">
+                                            <Text className="text-2xl">✓</Text>
+                                        </View>
+                                        <Text className="paragraph-semibold text-dark-100">
+                                            View Transaction History
+                                        </Text>
+                                    </View>
+                                    <Image source={images.arrowRight} className="size-5" resizeMode="contain" />
+                                </TouchableOpacity>
+                            )}
                         </View>
-                        <Image source={images.arrowRight} className="size-5" resizeMode="contain" />
-                    </TouchableOpacity>
+                    )}
 
                     {/* Logout */}
                     <TouchableOpacity
@@ -319,6 +393,7 @@ const Profile = () => {
                 onClose={handleCloseAddEditModal}
                 editAddress={editingAddress}
             />
+
         </SafeAreaView>
     );
 };

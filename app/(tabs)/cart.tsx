@@ -1,4 +1,4 @@
-// app/(tabs)/cart.tsx - STATIC QR VERSION
+// app/(tabs)/cart.tsx - FIXED VERSION
 
 import { View, Text, FlatList, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -85,7 +85,18 @@ const Cart = () => {
                 customizations: item.customizations || [],
             }));
 
-            // Create order
+            // ✅ FIX: Lưu payment_method chính xác
+            let paymentMethodToSave: string;
+            
+            if (method === 'cod') {
+                paymentMethodToSave = 'cod';
+            } else if (method === 'qr') {
+                paymentMethodToSave = 'bidv'; // ✅ Lưu tên ngân hàng, không phải "momo"
+            } else {
+                paymentMethodToSave = 'card';
+            }
+
+            // Create order với payment_method đúng
             const order = await createOrder(user.$id, {
                 items: orderItems,
                 subtotal,
@@ -94,7 +105,7 @@ const Cart = () => {
                 total,
                 delivery_address: defaultAddress?.fullAddress || '',
                 delivery_phone: user.phone || '',
-                payment_method: method === 'qr' ? 'momo' : method,
+                payment_method: paymentMethodToSave, // ✅ Lưu ngân hàng thực tế
             });
 
             setCurrentOrder(order);
@@ -115,7 +126,7 @@ const Cart = () => {
                     ]
                 );
             } else if (method === 'qr') {
-                // ✅ Static QR Payment - Show modal with QR code
+                // QR Payment - Show modal
                 setShowQRModal(true);
             } else if (method === 'card') {
                 // Card Payment
@@ -178,6 +189,65 @@ const Cart = () => {
         } finally {
             setIsProcessing(false);
         }
+    };
+
+    const handleCancelToPending = () => {
+        Alert.alert(
+            'Order Saved as Pending 📦',
+            'Your order has been saved. Please clear your cart to continue shopping.',
+            [
+                {
+                    text: 'Clear Cart',
+                    onPress: async () => {
+                        await clearCart();
+                        setCurrentOrder(null);
+                    },
+                },
+                {
+                    text: 'Keep Items',
+                    style: 'cancel',
+                },
+            ]
+        );
+    };
+
+    const handleSwitchToCard = () => {
+        setShowQRModal(false);
+        setTimeout(() => {
+            setShowCardModal(true);
+        }, 300);
+    };
+
+    const handleSwitchToCOD = async () => {
+        if (!currentOrder) return;
+        
+        try {
+            // Update order to COD
+            await updatePaymentStatus(currentOrder.$id, 'paid', `COD${Date.now()}`);
+            await clearCart();
+            
+            Alert.alert(
+                'Order Updated! 🎉',
+                `Order #${currentOrder.order_number} has been updated to Cash on Delivery.`,
+                [
+                    {
+                        text: 'View Order',
+                        onPress: () => router.push('/profile'),
+                    },
+                ]
+            );
+            
+            setShowQRModal(false);
+            setCurrentOrder(null);
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Unable to update order');
+        }
+    };
+
+    const handleRefreshOrders = () => {
+        // This will be called from profile page
+        // For now, just navigate to profile to refresh
+        router.push('/profile');
     };
 
     if (isProcessing) {
@@ -256,7 +326,7 @@ const Cart = () => {
                 />
             )}
 
-            {/* QR Code Payment Modal - Static QR */}
+            {/* QR Code Payment Modal */}
             {currentOrder && showQRModal && (
                 <QRCodePaymentModal
                     visible={showQRModal}
@@ -265,6 +335,10 @@ const Cart = () => {
                     totalAmount={total}
                     orderNumber={currentOrder.order_number}
                     orderId={currentOrder.$id}
+                    onCancelToPending={handleCancelToPending}
+                    onRefresh={handleRefreshOrders}
+                    onSwitchToCard={handleSwitchToCard}
+                    onSwitchToCOD={handleSwitchToCOD}
                 />
             )}
 
@@ -276,6 +350,9 @@ const Cart = () => {
                     onConfirmPayment={handleConfirmCardPayment}
                     totalAmount={total}
                     orderNumber={currentOrder.order_number}
+                    orderId={currentOrder.$id}
+                    onCancelToPending={handleCancelToPending}
+                    onRefresh={handleRefreshOrders}
                 />
             )}
         </SafeAreaView>

@@ -1,13 +1,11 @@
-// backend/server.js - FIXED VERSION WITH PROPER API KEY
+// backend/server.js - FIXED VERSION (CHỈ CẬP NHẬT, KHÔNG TẠO MỚI)
 
 const express = require('express');
 const { Client, Databases, Query } = require('node-appwrite');
 const app = express();
 
-// ✅ Parse JSON body
 app.use(express.json());
 
-// ✅ CORS
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -20,15 +18,12 @@ app.use((req, res, next) => {
     next();
 });
 
-// ✅ Appwrite Config
 const APPWRITE_CONFIG = {
     endpoint: 'https://nyc.cloud.appwrite.io/v1',
     projectId: '69230ad2001fb8f2aee4',
     databaseId: '68629ae60038a7c61fe4',
     ordersCollectionId: 'orders',
-    // 🔥 IMPORTANT: THAY BẰNG API KEY MỚI TỪ APPWRITE CONSOLE
-    // Tạo API key với scopes: databases.read + databases.write
-    apiKey: process.env.APPWRITE_API_KEY || 'YOUR_NEW_API_KEY_HERE',
+    apiKey: process.env.APPWRITE_API_KEY || 'YOUR_API_KEY_HERE',
 };
 
 /**
@@ -43,7 +38,7 @@ app.get('/', (req, res) => {
 });
 
 /**
- * ✅ SEPAY WEBHOOK - BIDV
+ * ✅ SEPAY WEBHOOK - BIDV (CHỈ CẬP NHẬT ORDER)
  */
 app.post('/api/sepay-webhook', async (req, res) => {
     try {
@@ -66,7 +61,7 @@ app.post('/api/sepay-webhook', async (req, res) => {
         console.log('📝 Description:', description);
         console.log('🔢 Sender Account:', accountNumber);
 
-        // 🔥 FIX: Validate với dữ liệu thực tế
+        // Validate
         if (!transferAmount || !content) {
             console.error('❌ Missing required fields');
             return res.status(400).json({
@@ -75,18 +70,13 @@ app.post('/api/sepay-webhook', async (req, res) => {
             });
         }
 
-        // 🔥 FIX: Extract receiver account từ content hoặc description
-        // Format: "BIDV;96247C3FS8;DH ORD1764768833721631"
+        // Extract receiver account
         let receiverAccount = null;
-
-        // ✅ FIXED REGEX: Chấp nhận cả chữ và số (alphanumeric)
-        // Try content first
         const contentMatch = content.match(/BIDV;([A-Z0-9]+);/i);
         if (contentMatch) {
             receiverAccount = contentMatch[1];
         }
 
-        // If not found, try description
         if (!receiverAccount && description) {
             const descMatch = description.match(/BIDV;([A-Z0-9]+);/i);
             if (descMatch) {
@@ -96,7 +86,7 @@ app.post('/api/sepay-webhook', async (req, res) => {
 
         console.log('🔍 Extracted receiver account:', receiverAccount);
 
-        // ✅ Verify receiver account
+        // Verify receiver account
         if (receiverAccount !== '96247C3FS8') {
             console.error('❌ Wrong receiver account:', receiverAccount);
             return res.status(400).json({
@@ -105,17 +95,14 @@ app.post('/api/sepay-webhook', async (req, res) => {
             });
         }
 
-        // ✅ Extract order number
+        // Extract order number
         let orderNumber = null;
 
-        // 🔥 FIX: Format từ Sepay: "BIDV;96247C3FS8;DH ORD1764768833721631"
-        // Try content first
         const contentOrderMatch = content.match(/DH\s*ORD\d+/i);
         if (contentOrderMatch) {
             orderNumber = contentOrderMatch[0].replace(/^DH\s*/i, '').toUpperCase();
         }
 
-        // If not found in content, try description
         if (!orderNumber && description) {
             const descOrderMatch = description.match(/DH\s*ORD\d+/i);
             if (descOrderMatch) {
@@ -123,7 +110,6 @@ app.post('/api/sepay-webhook', async (req, res) => {
             }
         }
 
-        // If still not found, try direct ORD pattern
         if (!orderNumber) {
             const directMatch = (content + ' ' + (description || '')).match(/ORD\d+/i);
             if (directMatch) {
@@ -141,7 +127,7 @@ app.post('/api/sepay-webhook', async (req, res) => {
             });
         }
 
-        // ✅ Find order
+        // ✅ Find order BY ORDER_NUMBER (NOT $id)
         const order = await findOrderByNumber(orderNumber);
 
         if (!order) {
@@ -156,9 +142,18 @@ app.post('/api/sepay-webhook', async (req, res) => {
         console.log('💵 Expected amount:', order.total);
         console.log('💵 Received amount:', transferAmount);
 
-        // ✅ Check amount
+        // ✅ FIX: Kiểm tra trạng thái order trước khi cập nhật
+        if (order.payment_status === 'paid') {
+            console.log('⚠️ Order đã được thanh toán trước đó, bỏ qua webhook');
+            return res.status(200).json({
+                success: true,
+                message: 'Order already paid, skipping update'
+            });
+        }
+
+        // Check amount
         if (transferAmount >= order.total) {
-            // SUCCESS
+            // ✅ SUCCESS - CẬP NHẬT ORDER (KHÔNG TẠO MỚI)
             await updateOrderPaymentStatus(
                 order.$id,
                 code,
@@ -166,7 +161,7 @@ app.post('/api/sepay-webhook', async (req, res) => {
                 transferAmount
             );
 
-            console.log('✅ Payment confirmed!');
+            console.log('✅ Payment confirmed! Order updated.');
 
             return res.status(200).json({
                 success: true,
@@ -199,7 +194,7 @@ app.post('/api/sepay-webhook', async (req, res) => {
 });
 
 /**
- * 🔥 FIXED: Find order by order_number (NOT $id)
+ * Find order by order_number
  */
 async function findOrderByNumber(orderNumber) {
     try {
@@ -211,10 +206,7 @@ async function findOrderByNumber(orderNumber) {
         const databases = new Databases(client);
 
         console.log('🔍 Searching for order:', orderNumber);
-        console.log('📂 Database:', APPWRITE_CONFIG.databaseId);
-        console.log('📂 Collection:', APPWRITE_CONFIG.ordersCollectionId);
 
-        // 🔥 FIX: Query bằng order_number, không phải $id
         const orders = await databases.listDocuments(
             APPWRITE_CONFIG.databaseId,
             APPWRITE_CONFIG.ordersCollectionId,
@@ -231,13 +223,12 @@ async function findOrderByNumber(orderNumber) {
 
     } catch (error) {
         console.error('❌ Find order error:', error.message);
-        console.error('Full error:', error);
         return null;
     }
 }
 
 /**
- * Update order payment status
+ * ✅ CẬP NHẬT order payment status (KHÔNG TẠO MỚI)
  */
 async function updateOrderPaymentStatus(orderId, transId, status, receivedAmount = 0) {
     try {
@@ -248,6 +239,7 @@ async function updateOrderPaymentStatus(orderId, transId, status, receivedAmount
 
         const databases = new Databases(client);
 
+        // ✅ CHỈ CẬP NHẬT ORDER HIỆN TẠI, KHÔNG TẠO MỚI
         await databases.updateDocument(
             APPWRITE_CONFIG.databaseId,
             APPWRITE_CONFIG.ordersCollectionId,
@@ -270,17 +262,15 @@ async function updateOrderPaymentStatus(orderId, transId, status, receivedAmount
     }
 }
 
-// ✅ Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`📡 Sepay Webhook: http://localhost:${PORT}/api/sepay-webhook`);
     console.log(`\n⚙️  Setup guide:`);
     console.log(`   1. Go to https://my.sepay.vn`);
-    console.log(`   2. Vào Settings → Webhook`);
+    console.log(`   2. Settings → Webhook`);
     console.log(`   3. Add webhook URL: http://YOUR_PUBLIC_URL/api/sepay-webhook`);
-    console.log(`   4. Use ngrok for public URL (local testing)`);
-    console.log(`\n   💡 Ngrok command: npx ngrok http 3000`);
+    console.log(`   4. Use ngrok: npx ngrok http 3000`);
 });
 
 module.exports = app;
