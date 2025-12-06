@@ -7,12 +7,12 @@ import * as Sentry from '@sentry/react-native';
 import useAuthStore from "@/store/auth.store";
 import { useCartStore } from "@/store/cart.store";
 
+// ✅ Sentry config for SDK 54
 Sentry.init({
   dsn: 'https://94edd17ee98a307f2d85d750574c454a@o4506876178464768.ingest.us.sentry.io/4509588544094208',
-  sendDefaultPii: true,
-  replaysSessionSampleRate: 1,
-  replaysOnErrorSampleRate: 1,
-  integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
+  enableAutoPerformanceTracing: true,
+  enableCaptureFailedRequests: true,
+  tracesSampleRate: 1.0,
 });
 
 export default Sentry.wrap(function RootLayout() {
@@ -48,4 +48,5 @@ export default Sentry.wrap(function RootLayout() {
   return <Stack screenOptions={{ headerShown: false }} />;
 });
 
-Sentry.showFeedbackWidget();
+// ✅ Feedback widget tạm thời comment vì chưa stable
+// Sentry.showFeedbackWidget();

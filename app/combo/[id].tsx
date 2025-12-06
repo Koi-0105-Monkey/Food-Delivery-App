@@ -1,4 +1,4 @@
-// app/combo/[id].tsx - Combo Detail Screen
+// app/combo/[id].tsx - FIXED LAYOUT
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
@@ -25,7 +25,7 @@ const ComboScreen = () => {
     
     const { addItem } = useCartStore();
     
-    const discountPercent = 15; // 15% discount for combo items
+    const discountPercent = 15;
 
     useEffect(() => {
         loadMenuItems();
@@ -34,7 +34,6 @@ const ComboScreen = () => {
     const loadMenuItems = async () => {
         try {
             setLoading(true);
-            // Filter by tabs field instead of category
             const items = await getMenu({ category: '', query: '', tabs: comboId.toString() });
             setMenuItems(items as MenuItem[]);
         } catch (error) {
@@ -45,18 +44,16 @@ const ComboScreen = () => {
     };
 
     const handleAddToCart = (item: MenuItem) => {
-        // Calculate discounted price
         const discountedPrice = item.price * (1 - discountPercent / 100);
         
         addItem({
             id: item.$id,
             name: item.name,
-            price: discountedPrice, // Use discounted price
+            price: discountedPrice,
             image_url: item.image_url,
             customizations: [],
         });
 
-        // Show toast notification
         setToastMessage(`✅ ${item.name} added to cart with ${discountPercent}% off!`);
         setShowToast(true);
     };
@@ -147,23 +144,45 @@ const ComboScreen = () => {
                         </View>
 
                         <View className="flex-row flex-wrap gap-4">
-                            {menuItems.map((item, index) => {
+                            {menuItems.map((item) => {
                                 const discountedPrice = item.price * (1 - discountPercent / 100);
 
                                 return (
                                     <View key={item.$id} className="w-[48%]">
                                         <View 
-                                            className="menu-card"
                                             style={{
                                                 borderWidth: 2,
                                                 borderColor: offer.color + '30',
+                                                borderRadius: 24,
+                                                padding: 14,
+                                                paddingTop: 80,
+                                                backgroundColor: 'white',
+                                                position: 'relative',
+                                                minHeight: 240,
                                             }}
                                         >
-                                            <Image
-                                                source={{ uri: item.image_url }}
-                                                className="size-32 absolute -top-10"
-                                                resizeMode="contain"
-                                            />
+                                            {/* ✅ FIX: Product Image - Positioned correctly */}
+                                            <View
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: -30,
+                                                    left: 0,
+                                                    right: 0,
+                                                    height: 110,
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    zIndex: 5,
+                                                }}
+                                            >
+                                                <Image
+                                                    source={{ uri: item.image_url }}
+                                                    style={{ 
+                                                        width: 100, 
+                                                        height: 100,
+                                                    }}
+                                                    resizeMode="contain"
+                                                />
+                                            </View>
 
                                             {/* Discount Badge */}
                                             <View 
@@ -183,13 +202,36 @@ const ComboScreen = () => {
                                                 </Text>
                                             </View>
 
-                                            {/* Rating */}
-                                            <View className="absolute top-2 left-2 bg-white/90 rounded-full px-2 py-1">
+                                            {/* Rating Badge */}
+                                            <View 
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: 8,
+                                                    left: 8,
+                                                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                                    borderRadius: 20,
+                                                    paddingHorizontal: 8,
+                                                    paddingVertical: 4,
+                                                    zIndex: 10,
+                                                }}
+                                            >
                                                 <Text className="small-bold text-dark-100">⭐ {item.rating}</Text>
                                             </View>
 
-                                            <Text className="text-center base-bold text-dark-100 mb-2 mt-20" numberOfLines={2}>
-                                                {item.name}
+                                            {/* ✅ FIX: Product Name - Truncate with ellipsis */}
+                                            <Text 
+                                                className="text-center base-bold text-dark-100 mb-2"
+                                                numberOfLines={2}
+                                                ellipsizeMode="tail"
+                                                style={{ 
+                                                    minHeight: 44,
+                                                    lineHeight: 22,
+                                                }}
+                                            >
+                                                {item.name.length > 20 
+                                                    ? item.name.substring(0, 20) + '...' 
+                                                    : item.name
+                                                }
                                             </Text>
                                             
                                             <View className="flex-row items-center justify-center gap-2 mb-3">
@@ -245,4 +287,3 @@ const ComboScreen = () => {
 };
 
 export default ComboScreen;
-

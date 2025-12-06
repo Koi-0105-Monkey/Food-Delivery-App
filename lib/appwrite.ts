@@ -176,7 +176,6 @@ export const getCurrentUser = async () => {
         const currentAccount = await account.get();
 
         if (!currentAccount) {
-            console.log('❌ No account found');
             return null;
         }
 
@@ -190,18 +189,22 @@ export const getCurrentUser = async () => {
         );
 
         if (!currentUser || currentUser.documents.length === 0) {
-            console.log('❌ User document not found');
+            console.log('⚠️ User document not found for account:', currentAccount.$id);
             return null;
         }
 
         console.log('✅ User document found:', currentUser.documents[0].email);
         return currentUser.documents[0];
     } catch (error: any) {
-        console.error('❌ Get current user error:', error.message);
-        
-        // If session expired or invalid, return null (not an error)
-        if (error.code === 401 || error.message?.includes('session') || error.message?.includes('guests')) {
+        // ✅ FIX: Don't log error if user is just not authenticated (guests role)
+        if (error.code === 401 || error.message?.includes('guests')) {
+            // Silent fail - no session is not an error, it's expected
             return null;
+        }
+        
+        // Only log unexpected errors
+        if (error.message && !error.message.includes('session')) {
+            console.error('❌ Get current user error:', error.message);
         }
 
         return null;
