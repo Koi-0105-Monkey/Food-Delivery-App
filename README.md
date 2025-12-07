@@ -136,3 +136,8 @@ Run ngrok http 3000 again
 
 Link figma:
 https://www.figma.com/design/FIe3i6vwpWeUOvVwno7ua3/Food-Delivery-App?node-id=0-1&p=f
+
+Nhánh detail 
+chạy 2 file scripts:
+node scripts/upload-customization-images.js
+node scripts/update-customization-images.js
