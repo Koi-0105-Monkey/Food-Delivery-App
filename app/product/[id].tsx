@@ -1,18 +1,21 @@
-// app/product/[id].tsx - WITH TOAST & COMBO DISCOUNT
+// app/product/[id].tsx - FIXED IMAGE LOADING
 
 import { View, Text, Image, ScrollView, TouchableOpacity, Alert, Animated, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
 import * as Haptics from 'expo-haptics';
-import { images } from '@/constants';
 import { MenuItem, CartCustomization } from '@/type';
 import { useCartStore } from '@/store/cart.store';
-import { databases, appwriteConfig } from '@/lib/appwrite';
+import { databases, appwriteConfig, storage } from '@/lib/appwrite';
 import { Query } from 'react-native-appwrite';
 import CustomButton from '@/components/CustomButton';
 import Toast from '@/components/Toast';
 import cn from 'clsx';
+
+// Import images
+import * as Constants from '@/constants';
+const images = Constants.images;
 
 const ProductDetail = () => {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -27,12 +30,10 @@ const ProductDetail = () => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
-    // Fetch product details
     useEffect(() => {
         fetchProductDetail();
     }, [id]);
 
-    // Animate in
     useEffect(() => {
         if (!loading && product) {
             Animated.parallel([
@@ -51,11 +52,23 @@ const ProductDetail = () => {
         }
     }, [loading, product]);
 
+    // ✅ FIXED: Better image URL generation
+    const getImageUrl = (imageId: string | null | undefined): string | null => {
+        if (!imageId) return null;
+        
+        try {
+            // Format: https://[ENDPOINT]/storage/buckets/[BUCKET_ID]/files/[FILE_ID]/view?project=[PROJECT_ID]
+            return `${appwriteConfig.endpoint}/storage/buckets/${appwriteConfig.bucketId}/files/${imageId}/view?project=${appwriteConfig.projectId}`;
+        } catch (error) {
+            console.error('❌ Error generating image URL:', error);
+            return null;
+        }
+    };
+
     const fetchProductDetail = async () => {
         try {
             setLoading(true);
 
-            // Get product
             const productDoc = await databases.getDocument(
                 appwriteConfig.databaseId,
                 appwriteConfig.menuCollectionId,
@@ -64,36 +77,82 @@ const ProductDetail = () => {
 
             setProduct(productDoc as MenuItem);
 
-            // Get customizations for this product
+            // Get menu_customizations
             const menuCustomizations = await databases.listDocuments(
                 appwriteConfig.databaseId,
                 appwriteConfig.menuCustomizationsCollectionId,
                 [Query.equal('menu', id)]
             );
 
-            // Get full customization details
-            const customizationIds = menuCustomizations.documents.map(
-                (doc: any) => doc.customizations
-            );
+            // Extract customization IDs
+            const customizationIds: string[] = [];
+            
+            for (const doc of menuCustomizations.documents) {
+                const cusField = (doc as any).customizations;
+                
+                if (typeof cusField === 'string') {
+                    customizationIds.push(cusField);
+                } else if (cusField?.$id) {
+                    customizationIds.push(cusField.$id);
+                }
+            }
 
             if (customizationIds.length > 0) {
-                const customizationDocs = await databases.listDocuments(
-                    appwriteConfig.databaseId,
-                    appwriteConfig.customizationsCollectionId,
-                    [Query.equal('$id', customizationIds)]
-                );
+                // Validate IDs
+                const validIds = customizationIds.filter(id => {
+                    return id && 
+                          typeof id === 'string' && 
+                          id.length <= 36 && 
+                          /^[a-zA-Z0-9_]+$/.test(id) &&
+                          !id.startsWith('_');
+                });
 
-                setAvailableCustomizations(customizationDocs.documents);
+                if (validIds.length > 0) {
+                    // Fetch customizations
+                    const customizationPromises = validIds.map((cusId: string) =>
+                        databases.getDocument(
+                            appwriteConfig.databaseId,
+                            appwriteConfig.customizationsCollectionId,
+                            cusId
+                        ).catch(err => {
+                            console.error(`❌ Failed to fetch customization ${cusId}:`, err.message);
+                            return null;
+                        })
+                    );
+
+                    const customizationDocs = await Promise.all(customizationPromises);
+                    const validCustomizations = customizationDocs.filter(doc => doc !== null);
+                    
+                    // ✅ FIXED: Generate proper image URLs
+                    const customizationsWithImages = validCustomizations.map((doc: any) => {
+                        let imageUrl = null;
+                        
+                        if (doc.image_id) {
+                            imageUrl = getImageUrl(doc.image_id);
+                            
+                            // Debug log
+                            console.log(`🖼️  ${doc.name}: ${imageUrl ? '✅ Has image' : '❌ No image'}`);
+                        }
+                        
+                        return {
+                            ...doc,
+                            imageUrl
+                        };
+                    });
+                    
+                    setAvailableCustomizations(customizationsWithImages);
+                    
+                    console.log(`✅ Loaded ${customizationsWithImages.length} customizations`);
+                }
             }
         } catch (error: any) {
-            console.error('Failed to fetch product:', error);
+            console.error('❌ Failed to fetch product:', error);
             Alert.alert('Error', 'Failed to load product details');
         } finally {
             setLoading(false);
         }
     };
 
-    // ✅ COMBO DISCOUNT LOGIC
     const getDiscountedPrice = () => {
         if (!product || !product.tabs || product.tabs.trim() === '') {
             return product?.price || 0;
@@ -102,9 +161,9 @@ const ProductDetail = () => {
         const comboIds = product.tabs.split(',').map(id => id.trim()).filter(Boolean);
         
         if (comboIds.length >= 2) {
-            return product.price * 0.8; // 20% discount
+            return product.price * 0.8;
         } else if (comboIds.length === 1) {
-            return product.price * 0.85; // 15% discount
+            return product.price * 0.85;
         }
 
         return product.price;
@@ -143,13 +202,25 @@ const ProductDetail = () => {
     const calculateTotalPrice = () => {
         if (!product) return 0;
 
-        const basePrice = getDiscountedPrice(); // ✅ Use discounted price
+        const basePrice = getDiscountedPrice();
         const customizationPrice = selectedCustomizations.reduce(
             (sum, c) => sum + c.price,
             0
         );
 
         return (basePrice + customizationPrice) * quantity;
+    };
+
+    const getItemPrice = () => {
+        if (!product) return 0;
+        
+        const basePrice = getDiscountedPrice();
+        const customizationPrice = selectedCustomizations.reduce(
+            (sum, c) => sum + c.price,
+            0
+        );
+        
+        return basePrice + customizationPrice;
     };
 
     const [showToast, setShowToast] = useState(false);
@@ -160,24 +231,21 @@ const ProductDetail = () => {
 
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-        const basePrice = getDiscountedPrice(); // ✅ Use discounted price
+        const finalPrice = getItemPrice();
 
-        // Add item to cart multiple times based on quantity
         for (let i = 0; i < quantity; i++) {
             addItem({
                 id: product.$id,
                 name: product.name,
-                price: basePrice, // ✅ Use discounted price
+                price: finalPrice,
                 image_url: product.image_url,
                 customizations: selectedCustomizations,
             });
         }
 
-        // Show toast notification
         setToastMessage(`✅ ${quantity}x ${product.name} added to cart!`);
         setShowToast(true);
 
-        // Reset selections
         setQuantity(1);
         setSelectedCustomizations([]);
     };
@@ -199,13 +267,11 @@ const ProductDetail = () => {
         );
     }
 
-    // Calculate discount info
     const basePrice = product.price;
     const discountedPrice = getDiscountedPrice();
     const hasDiscount = discountedPrice < basePrice;
     const discountPercent = hasDiscount ? Math.round(((basePrice - discountedPrice) / basePrice) * 100) : 0;
 
-    // Group customizations by type
     const toppings = availableCustomizations.filter(c => c.type === 'topping');
     const sides = availableCustomizations.filter(c => c.type === 'side');
 
@@ -310,13 +376,13 @@ const ProductDetail = () => {
                             </View>
                         </View>
 
-                        {/* Toppings */}
+                        {/* ✅ Toppings WITH REAL IMAGES */}
                         {toppings.length > 0 && (
                             <View className="mb-6">
                                 <Text className="base-bold text-dark-100 mb-3">
-                                    Add Toppings
+                                    🍕 Add Toppings
                                 </Text>
-                                <View className="flex-row flex-wrap gap-2">
+                                <View className="flex-row flex-wrap gap-3">
                                     {toppings.map((topping: any) => {
                                         const isSelected = selectedCustomizations.some(
                                             c => c.id === topping.$id
@@ -326,20 +392,62 @@ const ProductDetail = () => {
                                             <TouchableOpacity
                                                 key={topping.$id}
                                                 onPress={() => handleCustomizationToggle(topping)}
-                                                className={cn(
-                                                    'px-4 py-2.5 rounded-full border',
-                                                    isSelected
-                                                        ? 'bg-primary border-primary'
-                                                        : 'bg-white border-gray-200'
-                                                )}
+                                                style={{
+                                                    width: '30%',
+                                                    backgroundColor: isSelected ? '#FFF5E6' : 'white',
+                                                    borderRadius: 16,
+                                                    padding: 12,
+                                                    borderWidth: 2,
+                                                    borderColor: isSelected ? '#FE8C00' : '#F3F4F6',
+                                                    alignItems: 'center',
+                                                }}
                                             >
-                                                <Text
-                                                    className={cn(
-                                                        'body-medium',
-                                                        isSelected ? 'text-white' : 'text-dark-100'
-                                                    )}
+                                                {/* ✅ FIXED: Hiển thị ảnh thật với cache busting */}
+                                                {topping.imageUrl ? (
+                                                    <Image
+                                                        source={{ 
+                                                            uri: `${topping.imageUrl}&t=${Date.now()}`,
+                                                            cache: 'reload'
+                                                        }}
+                                                        style={{ 
+                                                            width: 48, 
+                                                            height: 48, 
+                                                            marginBottom: 8,
+                                                            borderRadius: 8,
+                                                        }}
+                                                        resizeMode="cover"
+                                                        onError={(e) => {
+                                                            console.error(`❌ Image load failed for ${topping.name}:`, e.nativeEvent.error);
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <View
+                                                        style={{
+                                                            width: 48,
+                                                            height: 48,
+                                                            marginBottom: 8,
+                                                            borderRadius: 8,
+                                                            backgroundColor: '#FFF5E6',
+                                                            justifyContent: 'center',
+                                                            alignItems: 'center',
+                                                        }}
+                                                    >
+                                                        <Text style={{ fontSize: 24 }}>🍕</Text>
+                                                    </View>
+                                                )}
+                                                
+                                                <Text 
+                                                    className="body-medium text-dark-100 text-center"
+                                                    numberOfLines={2}
+                                                    style={{ minHeight: 36 }}
                                                 >
-                                                    {topping.name} +{topping.price.toLocaleString('vi-VN')}đ
+                                                    {topping.name}
+                                                </Text>
+                                                
+                                                <Text 
+                                                    className="small-bold text-primary mt-1"
+                                                >
+                                                    +{topping.price.toLocaleString('vi-VN')}đ
                                                 </Text>
                                             </TouchableOpacity>
                                         );
@@ -348,11 +456,13 @@ const ProductDetail = () => {
                             </View>
                         )}
 
-                        {/* Sides */}
+                        {/* ✅ Sides WITH REAL IMAGES */}
                         {sides.length > 0 && (
                             <View className="mb-6">
-                                <Text className="base-bold text-dark-100 mb-3">Add Sides</Text>
-                                <View className="flex-row flex-wrap gap-2">
+                                <Text className="base-bold text-dark-100 mb-3">
+                                    🍟 Add Sides
+                                </Text>
+                                <View className="flex-row flex-wrap gap-3">
                                     {sides.map((side: any) => {
                                         const isSelected = selectedCustomizations.some(
                                             c => c.id === side.$id
@@ -362,20 +472,62 @@ const ProductDetail = () => {
                                             <TouchableOpacity
                                                 key={side.$id}
                                                 onPress={() => handleCustomizationToggle(side)}
-                                                className={cn(
-                                                    'px-4 py-2.5 rounded-full border',
-                                                    isSelected
-                                                        ? 'bg-primary border-primary'
-                                                        : 'bg-white border-gray-200'
-                                                )}
+                                                style={{
+                                                    width: '30%',
+                                                    backgroundColor: isSelected ? '#E8F5E9' : 'white',
+                                                    borderRadius: 16,
+                                                    padding: 12,
+                                                    borderWidth: 2,
+                                                    borderColor: isSelected ? '#2F9B65' : '#F3F4F6',
+                                                    alignItems: 'center',
+                                                }}
                                             >
-                                                <Text
-                                                    className={cn(
-                                                        'body-medium',
-                                                        isSelected ? 'text-white' : 'text-dark-100'
-                                                    )}
+                                                {/* ✅ FIXED: Hiển thị ảnh thật với cache busting */}
+                                                {side.imageUrl ? (
+                                                    <Image
+                                                        source={{ 
+                                                            uri: `${side.imageUrl}&t=${Date.now()}`,
+                                                            cache: 'reload'
+                                                        }}
+                                                        style={{ 
+                                                            width: 48, 
+                                                            height: 48, 
+                                                            marginBottom: 8,
+                                                            borderRadius: 8,
+                                                        }}
+                                                        resizeMode="cover"
+                                                        onError={(e) => {
+                                                            console.error(`❌ Image load failed for ${side.name}:`, e.nativeEvent.error);
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <View
+                                                        style={{
+                                                            width: 48,
+                                                            height: 48,
+                                                            marginBottom: 8,
+                                                            borderRadius: 8,
+                                                            backgroundColor: '#E8F5E9',
+                                                            justifyContent: 'center',
+                                                            alignItems: 'center',
+                                                        }}
+                                                    >
+                                                        <Text style={{ fontSize: 24 }}>🍟</Text>
+                                                    </View>
+                                                )}
+                                                
+                                                <Text 
+                                                    className="body-medium text-dark-100 text-center"
+                                                    numberOfLines={2}
+                                                    style={{ minHeight: 36 }}
                                                 >
-                                                    {side.name} +{side.price.toLocaleString('vi-VN')}đ
+                                                    {side.name}
+                                                </Text>
+                                                
+                                                <Text 
+                                                    className="small-bold text-success mt-1"
+                                                >
+                                                    +{side.price.toLocaleString('vi-VN')}đ
                                                 </Text>
                                             </TouchableOpacity>
                                         );
@@ -400,6 +552,16 @@ const ProductDetail = () => {
                                         </Text>
                                     </View>
                                 ))}
+                                <View className="border-t border-gray-300 mt-2 pt-2">
+                                    <View className="flex-row justify-between">
+                                        <Text className="paragraph-bold text-dark-100">
+                                            Customizations Total:
+                                        </Text>
+                                        <Text className="paragraph-bold text-success">
+                                            +{selectedCustomizations.reduce((sum, c) => sum + c.price, 0).toLocaleString('vi-VN')}đ
+                                        </Text>
+                                    </View>
+                                </View>
                             </View>
                         )}
                     </View>
