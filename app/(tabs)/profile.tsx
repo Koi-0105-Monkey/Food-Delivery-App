@@ -1,4 +1,4 @@
-// app/(tabs)/profile.tsx - ENHANCED WITH PENDING & COMPLETED ORDERS
+// app/(tabs)/profile.tsx - FIXED VERSION (Xóa debug code)
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, Image, ScrollView, TouchableOpacity, Alert, Linking, ActivityIndicator } from 'react-native';
@@ -15,6 +15,9 @@ import EditProfileModal from '@/components/EditProfileModal';
 import { Address } from '@/store/address.store';
 import { getUserOrders } from '@/lib/payment';
 
+// ✅ FIXED: Xóa debug code dòng 18-42
+// ❌ const { user } = useAuthStore(); // Hook ngoài component
+
 const ProfileField = ({ label, value, icon }: { label: string; value: string; icon: any }) => (
     <View className="profile-field">
         <View className="profile-field__icon">
@@ -28,15 +31,17 @@ const ProfileField = ({ label, value, icon }: { label: string; value: string; ic
 );
 
 const Profile = () => {
+    // ✅ CORRECT: Hook calls inside component
     const { user, setIsAuthenticated, setUser } = useAuthStore();
     const { defaultAddress, getDisplayAddress, fetchAddresses } = useAddressStore();
+    
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [showAddressListModal, setShowAddressListModal] = useState(false);
     const [showAddEditModal, setShowAddEditModal] = useState(false);
     const [editingAddress, setEditingAddress] = useState<Address | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
     
-    // ✅ Order History State - Check if has orders (for showing buttons)
+    // Order History State
     const [hasPendingOrders, setHasPendingOrders] = useState(false);
     const [hasCompletedOrders, setHasCompletedOrders] = useState(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -47,7 +52,6 @@ const Profile = () => {
         }
     }, [user]);
 
-    // ✅ Refresh orders count when screen is focused
     useFocusEffect(
         React.useCallback(() => {
             if (user) {
@@ -56,14 +60,12 @@ const Profile = () => {
         }, [user])
     );
 
-    // ✅ Check orders count (silently, no logs)
     const checkOrdersCount = async () => {
         if (!user) return;
         
         try {
             const userOrders = await getUserOrders(user.$id);
             
-            // Split orders into pending and completed
             const pending = userOrders.filter(order => 
                 order.payment_status === 'pending' || 
                 order.payment_status === 'failed'
@@ -76,7 +78,6 @@ const Profile = () => {
             setHasPendingOrders(pending.length > 0);
             setHasCompletedOrders(completed.length > 0);
             
-            // Only log on initial app load
             if (isInitialLoad) {
                 console.log(`✅ Loaded ${pending.length} pending, ${completed.length} completed orders`);
                 setIsInitialLoad(false);
@@ -154,7 +155,6 @@ const Profile = () => {
         }, 300);
     };
 
-    // ✅ Navigate to orders screen
     const handleViewOrders = (type: 'pending' | 'completed') => {
         router.push(`/orders?type=${type}`);
     };
@@ -294,7 +294,7 @@ const Profile = () => {
                         </TouchableOpacity>
                     )}
 
-                    {/* ✅ Order History Buttons */}
+                    {/* Order History Buttons */}
                     {(hasPendingOrders || hasCompletedOrders) && (
                         <View className="mt-4">
                             <Text className="base-bold text-dark-100 mb-4">📦 Order History</Text>
@@ -333,6 +333,24 @@ const Profile = () => {
                                 </TouchableOpacity>
                             )}
                         </View>
+                    )}
+
+                    {/* 🔧 Admin Panel Button */}
+                    {user?.email === 'admin@fastfood.com' && (
+                        <TouchableOpacity
+                            className="bg-purple-100 border border-purple-500 rounded-2xl p-5 flex-row items-center justify-between mb-3"
+                            onPress={() => router.push('/admin/admin-login')}
+                        >
+                            <View className="flex-row items-center gap-3">
+                                <View className="size-12 rounded-full bg-purple-200 flex-center">
+                                    <Text className="text-2xl">👨‍💼</Text>
+                                </View>
+                                <Text className="paragraph-semibold text-purple-700">
+                                    Access Admin Panel
+                                </Text>
+                            </View>
+                            <Image source={images.arrowRight} className="size-5" resizeMode="contain" tintColor="#8B5CF6" />
+                        </TouchableOpacity>
                     )}
 
                     {/* Logout */}

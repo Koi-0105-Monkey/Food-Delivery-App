@@ -1,8 +1,8 @@
-// app/admin/_layout.tsx
-import { Tabs } from 'expo-router';
-import { Image, Text, View } from 'react-native';
+import { Tabs, Redirect } from 'expo-router';
+import { Image, Text, View, ActivityIndicator } from 'react-native';
 import { images } from '@/constants';
 import cn from 'clsx';
+import useAuthStore from '@/store/auth.store';
 
 const AdminTabIcon = ({ focused, icon, title }: { focused: boolean; icon: any; title: string }) => (
     <View className="items-center justify-center" style={{ marginTop: 12 }}>
@@ -19,6 +19,26 @@ const AdminTabIcon = ({ focused, icon, title }: { focused: boolean; icon: any; t
 );
 
 export default function AdminLayout() {
+    const { isAuthenticated, isAdmin, isLoading } = useAuthStore();
+
+    // ✅ Show loading while checking auth
+    if (isLoading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
+                <ActivityIndicator size="large" color="#FE8C00" />
+                <Text style={{ marginTop: 10, color: '#878787' }}>Checking permissions...</Text>
+            </View>
+        );
+    }
+
+    // ✅ Redirect if not admin
+    if (!isAuthenticated || !isAdmin) {
+        console.log('🚫 Access denied: Not an admin');
+        return <Redirect href="/sign-in" />;
+    }
+
+    console.log('✅ Admin access granted');
+
     return (
         <Tabs
             screenOptions={{

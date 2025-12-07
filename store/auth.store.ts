@@ -6,21 +6,31 @@ type AuthState = {
     isAuthenticated: boolean;
     user: User | null;
     isLoading: boolean;
+    isAdmin: boolean; // 👈 NEW
 
     setIsAuthenticated: (value: boolean) => void;
     setUser: (user: User | null) => void;
     setLoading: (loading: boolean) => void;
 
     fetchAuthenticatedUser: () => Promise<void>;
+    checkAdminRole: () => boolean; // 👈 NEW
 }
 
-const useAuthStore = create<AuthState>((set) => ({
+const useAuthStore = create<AuthState>((set, get) => ({
     isAuthenticated: false,
     user: null,
     isLoading: true,
+    isAdmin: false,
 
     setIsAuthenticated: (value) => set({ isAuthenticated: value }),
-    setUser: (user) => set({ user }),
+    
+    setUser: (user) => {
+        set({ 
+            user,
+            isAdmin: user?.role === 'admin' // ✅ Auto-detect admin
+        });
+    },
+    
     setLoading: (value) => set({ isLoading: value }),
 
     fetchAuthenticatedUser: async () => {
@@ -30,19 +40,24 @@ const useAuthStore = create<AuthState>((set) => ({
             const user = await getCurrentUser();
 
             if (user) {
+                const userWithRole = user as User;
+                
                 set({ 
                     isAuthenticated: true, 
-                    user: user as User,
+                    user: userWithRole,
+                    isAdmin: userWithRole.role === 'admin', // ✅ Check role
                     isLoading: false
                 });
-                console.log('✅ User authenticated:', user.email);
+                
+                console.log('✅ User authenticated:', userWithRole.email);
+                console.log('🔐 Role:', userWithRole.role || 'user');
             } else {
                 set({ 
                     isAuthenticated: false, 
                     user: null,
+                    isAdmin: false,
                     isLoading: false 
                 });
-                // ✅ FIX: Less noisy logging - no session is normal on first load
                 console.log('ℹ️  No active session');
             }
         } catch (e) {
@@ -50,9 +65,16 @@ const useAuthStore = create<AuthState>((set) => ({
             set({ 
                 isAuthenticated: false, 
                 user: null,
+                isAdmin: false,
                 isLoading: false 
             });
         }
+    },
+
+    // ✅ Helper function to check admin
+    checkAdminRole: () => {
+        const { user } = get();
+        return user?.role === 'admin';
     }
 }));
 

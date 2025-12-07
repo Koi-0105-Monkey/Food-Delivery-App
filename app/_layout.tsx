@@ -1,6 +1,6 @@
 import {SplashScreen, Stack} from "expo-router";
 import { useFonts } from 'expo-font';
-import { useEffect} from "react";
+import { useEffect } from "react";
 
 import './globals.css';
 import * as Sentry from '@sentry/react-native';
@@ -15,7 +15,8 @@ Sentry.init({
   tracesSampleRate: 1.0,
 });
 
-export default Sentry.wrap(function RootLayout() {
+function RootLayoutComponent() {
+  // ✅ ALL HOOKS MUST BE CALLED IN THE SAME ORDER EVERY RENDER
   const { isLoading, fetchAuthenticatedUser, user } = useAuthStore();
   const { loadCartFromServer } = useCartStore();
 
@@ -43,10 +44,12 @@ export default Sentry.wrap(function RootLayout() {
     }
   }, [user]);
 
+  // ❌ REMOVE useMemo - không cần thiết và gây lỗi hook order
+  // ✅ Chỉ cần return JSX trực tiếp
   if(!fontsLoaded || isLoading) return null;
 
   return <Stack screenOptions={{ headerShown: false }} />;
-});
+}
 
-// ✅ Feedback widget tạm thời comment vì chưa stable
-// Sentry.showFeedbackWidget();
+// ✅ Wrap with Sentry
+export default Sentry.wrap(RootLayoutComponent);

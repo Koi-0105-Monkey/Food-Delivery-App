@@ -22,6 +22,7 @@ export interface User extends Models.Document {
     email: string;
     avatar: string;
     phone: string;
+    role: 'user' | 'admin';
 }
 
 export interface Address {
