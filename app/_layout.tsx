@@ -1,13 +1,12 @@
-import {SplashScreen, Stack} from "expo-router";
+import {SplashScreen, Stack, useRouter, useSegments} from "expo-router";
 import { useFonts } from 'expo-font';
-import { useEffect} from "react";
+import { useEffect } from "react";
 
 import './globals.css';
 import * as Sentry from '@sentry/react-native';
 import useAuthStore from "@/store/auth.store";
 import { useCartStore } from "@/store/cart.store";
 
-// ✅ Sentry config for SDK 54
 Sentry.init({
   dsn: 'https://94edd17ee98a307f2d85d750574c454a@o4506876178464768.ingest.us.sentry.io/4509588544094208',
   enableAutoPerformanceTracing: true,
@@ -15,9 +14,11 @@ Sentry.init({
   tracesSampleRate: 1.0,
 });
 
-export default Sentry.wrap(function RootLayout() {
-  const { isLoading, fetchAuthenticatedUser, user } = useAuthStore();
+function RootLayoutComponent() {
+  const { isLoading, fetchAuthenticatedUser, user, isAdmin } = useAuthStore();
   const { loadCartFromServer } = useCartStore();
+  const router = useRouter();
+  const segments = useSegments();
 
   const [fontsLoaded, error] = useFonts({
     "QuickSand-Bold": require('../assets/fonts/Quicksand-Bold.ttf'),
@@ -36,17 +37,24 @@ export default Sentry.wrap(function RootLayout() {
     fetchAuthenticatedUser();
   }, []);
 
-  // Load cart when user is authenticated
+  // ✅ AUTO REDIRECT ADMIN ngay khi vào app
   useEffect(() => {
-    if (user) {
-      loadCartFromServer();
+    if (!isLoading && user) {
+      if (isAdmin) {
+        console.log('🔐 Admin detected, auto redirecting to dashboard...');
+        router.replace('/admin/dashboard');
+      }
+      
+      // Load cart for regular users
+      if (!isAdmin) {
+        loadCartFromServer();
+      }
     }
-  }, [user]);
+  }, [user, isAdmin, isLoading]);
 
   if(!fontsLoaded || isLoading) return null;
 
   return <Stack screenOptions={{ headerShown: false }} />;
-});
+}
 
-// ✅ Feedback widget tạm thời comment vì chưa stable
-// Sentry.showFeedbackWidget();
+export default Sentry.wrap(RootLayoutComponent);

@@ -29,7 +29,6 @@ const SignIn = () => {
         try {
             console.log('🔐 Starting sign in...');
             
-            // Sign in and wait for session to be established
             await signIn({ 
                 email: email.trim().toLowerCase(), 
                 password 
@@ -37,25 +36,34 @@ const SignIn = () => {
 
             console.log('✅ Sign in successful, fetching user...');
 
-            // Fetch user data and update auth state
+            // Fetch user data (includes role)
             await fetchAuthenticatedUser();
+            
+            // Get user from store to check role
+            const { user, isAdmin } = useAuthStore.getState();
 
-            console.log('✅ User fetched, redirecting to home...');
+            console.log('✅ User fetched:', user?.email);
+            console.log('🔐 Role:', user?.role);
 
-            // Redirect to home với param để trigger modal
-            router.replace('/?showWelcome=signin');
+            // ✅ Role-based redirect
+            if (isAdmin) {
+                console.log('🎯 Admin detected, redirecting to admin panel...');
+                router.replace('/admin/dashboard');
+            } else {
+                console.log('🎯 Regular user, redirecting to home...');
+                router.replace('/?showWelcome=signin');
+            }
 
         } catch (error: any) {
             console.error('❌ Sign in error:', error);
             
-            // Better error messages
             let errorMessage = 'Failed to sign in. Please check your credentials.';
             
-            if (error.message?.includes('Invalid credentials')) {
+            if (error.message?.includes('Invalid email or password')) {
                 errorMessage = 'Invalid email or password. Please try again.';
-            } else if (error.message?.includes('user_not_found')) {
+            } else if (error.message?.includes('No account found')) {
                 errorMessage = 'No account found with this email. Please sign up first.';
-            } else if (error.message?.includes('user_blocked')) {
+            } else if (error.message?.includes('blocked')) {
                 errorMessage = 'Your account has been blocked. Please contact support.';
             }
             

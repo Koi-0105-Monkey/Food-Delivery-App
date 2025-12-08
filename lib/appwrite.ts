@@ -1,7 +1,6 @@
 import { Account, Avatars, Client, Databases, ID, Query, Storage } from 'react-native-appwrite';
 import { CreateUserParams, GetMenuParams, SignInParams, User } from '@/type';
 
-// ========== APPWRITE CONFIGURATION FROM ENV ==========
 export const appwriteConfig = {
     endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!,
     projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!,
@@ -18,22 +17,6 @@ export const appwriteConfig = {
     ordersCollectionId: process.env.EXPO_PUBLIC_APPWRITE_ORDERS_COLLECTION_ID!,
 };
 
-// Validate required environment variables
-const requiredEnvVars = [
-    'EXPO_PUBLIC_APPWRITE_ENDPOINT',
-    'EXPO_PUBLIC_APPWRITE_PROJECT_ID',
-    'EXPO_PUBLIC_APPWRITE_PLATFORM',
-    'EXPO_PUBLIC_APPWRITE_DATABASE_ID',
-    'EXPO_PUBLIC_APPWRITE_BUCKET_ID',
-];
-
-for (const envVar of requiredEnvVars) {
-    if (!process.env[envVar]) {
-        throw new Error(`❌ Missing required environment variable: ${envVar}`);
-    }
-}
-
-// ========== CLIENT INITIALIZATION ==========
 export const client = new Client();
 
 client
@@ -46,24 +29,23 @@ export const databases = new Databases(client);
 export const storage = new Storage(client);
 const avatars = new Avatars(client);
 
-// Helper function to wait for session to be ready
 const waitForSession = (ms: number = 500) => 
     new Promise(resolve => setTimeout(resolve, ms));
 
 // ========== AUTH FUNCTIONS ==========
+
 export const createUser = async ({ email, password, name }: CreateUserParams) => {
     try {
-        // Check if session exists and delete it
+        // Check existing session
         try {
             const sessions = await account.listSessions();
             for (const session of sessions.sessions) {
                 await account.deleteSession(session.$id);
             }
         } catch (e) {
-            // No active session, continue
+            // No session
         }
 
-        // Create account
         const newAccount = await account.create(
             ID.unique(),
             email,
@@ -77,21 +59,17 @@ export const createUser = async ({ email, password, name }: CreateUserParams) =>
 
         console.log('✅ Account created:', newAccount.$id);
 
-        // Sign in the new user
         const session = await account.createEmailPasswordSession(email, password);
         console.log('✅ Session created:', session.$id);
 
-        // Wait for session to be fully established
         await waitForSession();
 
-        // Verify session is active
         const currentAccount = await account.get();
         console.log('✅ Account verified:', currentAccount.email);
 
-        // Create avatar
         const avatarUrl = avatars.getInitialsURL(name);
 
-        // Create user document
+        // ✅ Create user with default role
         const userDocument = await databases.createDocument(
             appwriteConfig.databaseId,
             appwriteConfig.userCollectionId,
@@ -101,6 +79,7 @@ export const createUser = async ({ email, password, name }: CreateUserParams) =>
                 name,
                 accountId: newAccount.$id,
                 avatar: avatarUrl.toString(),
+                role: 'user', // 👈 Default role
             }
         );
 
@@ -126,17 +105,17 @@ export const createUser = async ({ email, password, name }: CreateUserParams) =>
 
 export const signIn = async ({ email, password }: SignInParams) => {
     try {
-        // Delete any existing session first
+        // Delete existing session
         try {
             const sessions = await account.listSessions();
             for (const session of sessions.sessions) {
                 await account.deleteSession(session.$id);
             }
         } catch (e) {
-            // No active session, continue
+            // No session
         }
 
-        // Create new session
+        // Create session
         const session = await account.createEmailPasswordSession(email, password);
 
         if (!session) {
@@ -145,10 +124,8 @@ export const signIn = async ({ email, password }: SignInParams) => {
 
         console.log('✅ Session created:', session.$id);
 
-        // Wait for session to be fully established
         await waitForSession();
 
-        // Verify session is active
         const currentAccount = await account.get();
         console.log('✅ Account verified:', currentAccount.email);
 
@@ -156,14 +133,15 @@ export const signIn = async ({ email, password }: SignInParams) => {
     } catch (error: any) {
         console.error('❌ Sign in error:', error);
 
-        if (error.code === 401) {
-            throw new Error('Invalid credentials');
+        // ✅ Better error messages
+        if (error.code === 401 || error.message?.includes('Invalid credentials')) {
+            throw new Error('Invalid email or password');
         }
         if (error.message?.includes('user_not_found')) {
-            throw new Error('user_not_found');
+            throw new Error('No account found with this email');
         }
         if (error.message?.includes('user_blocked')) {
-            throw new Error('user_blocked');
+            throw new Error('Account has been blocked');
         }
 
         throw new Error(error.message || 'Failed to sign in');
@@ -172,7 +150,6 @@ export const signIn = async ({ email, password }: SignInParams) => {
 
 export const getCurrentUser = async () => {
     try {
-        // First verify we have an active session
         const currentAccount = await account.get();
 
         if (!currentAccount) {
@@ -181,7 +158,6 @@ export const getCurrentUser = async () => {
 
         console.log('✅ Account found:', currentAccount.email);
 
-        // Then get user document
         const currentUser = await databases.listDocuments(
             appwriteConfig.databaseId,
             appwriteConfig.userCollectionId,
@@ -193,16 +169,17 @@ export const getCurrentUser = async () => {
             return null;
         }
 
-        console.log('✅ User document found:', currentUser.documents[0].email);
-        return currentUser.documents[0];
+        const userData = currentUser.documents[0] as User;
+        
+        console.log('✅ User document found:', userData.email);
+        console.log('🔐 User role:', userData.role || 'user');
+
+        return userData;
     } catch (error: any) {
-        // ✅ FIX: Don't log error if user is just not authenticated (guests role)
         if (error.code === 401 || error.message?.includes('guests')) {
-            // Silent fail - no session is not an error, it's expected
             return null;
         }
         
-        // Only log unexpected errors
         if (error.message && !error.message.includes('session')) {
             console.error('❌ Get current user error:', error.message);
         }
@@ -212,6 +189,7 @@ export const getCurrentUser = async () => {
 };
 
 // ========== MENU FUNCTIONS ==========
+
 export const getMenu = async ({ category, query, tabs }: GetMenuParams) => {
     try {
         const queries: string[] = [];
@@ -227,11 +205,9 @@ export const getMenu = async ({ category, query, tabs }: GetMenuParams) => {
 
         let results = menus.documents;
 
-        // Filter by tabs if provided - items that contain the tab ID in their tabs field
         if (tabs) {
             results = results.filter((item: any) => {
                 const itemTabs = item.tabs || '';
-                // Check if tabs field contains the requested tab ID
                 return itemTabs.includes(tabs);
             });
         }

@@ -1,0 +1,577 @@
+// app/admin/menu.tsx - WITH STOCK MANAGEMENT & ENGLISH
+
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Image, Alert, RefreshControl, TextInput, Modal } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { databases, appwriteConfig, storage } from '@/lib/appwrite';
+import { images } from '@/constants';
+import { ID } from 'react-native-appwrite';
+import * as ImagePicker from 'expo-image-picker';
+
+interface MenuItem {
+    $id: string;
+    name: string;
+    description: string;
+    image_url: string;
+    price: number;
+    rating: number;
+    calories: number;
+    protein: number;
+    available: boolean;
+    stock: number;
+    categories?: string;
+}
+
+const AdminMenu = () => {
+    const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+    const [categories, setCategories] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [showAddEditModal, setShowAddEditModal] = useState(false);
+    const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+    const [form, setForm] = useState({
+        name: '',
+        description: '',
+        price: '',
+        rating: '',
+        calories: '',
+        protein: '',
+        stock: '',
+        image_url: '',
+    });
+
+    useEffect(() => {
+        loadMenu();
+    }, []);
+
+    const loadMenu = async () => {
+        try {
+            setLoading(true);
+            
+            const [menuResult, catResult] = await Promise.all([
+                databases.listDocuments(
+                    appwriteConfig.databaseId,
+                    appwriteConfig.menuCollectionId
+                ),
+                databases.listDocuments(
+                    appwriteConfig.databaseId,
+                    appwriteConfig.categoriesCollectionId
+                ),
+            ]);
+
+            setMenuItems(menuResult.documents as unknown as MenuItem[]);
+            setCategories(catResult.documents);
+        } catch (error) {
+            console.error('Failed to load menu:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleAvailability = async (itemId: string, currentStatus: boolean, itemName: string) => {
+        const action = currentStatus ? 'Pause Sales' : 'Resume Sales';
+        
+        Alert.alert(
+            action,
+            `Are you sure you want to ${action.toLowerCase()} for "${itemName}"?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: action,
+                    onPress: async () => {
+                        try {
+                            await databases.updateDocument(
+                                appwriteConfig.databaseId,
+                                appwriteConfig.menuCollectionId,
+                                itemId,
+                                { available: !currentStatus }
+                            );
+                            
+                            Alert.alert('Success', `"${itemName}" is now ${!currentStatus ? 'available' : 'unavailable'}`);
+                            loadMenu();
+                        } catch (error) {
+                            Alert.alert('Error', 'Failed to update availability');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleDelete = (item: MenuItem) => {
+        Alert.alert(
+            'Delete Item',
+            `Are you sure you want to delete "${item.name}"?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await databases.deleteDocument(
+                                appwriteConfig.databaseId,
+                                appwriteConfig.menuCollectionId,
+                                item.$id
+                            );
+                            Alert.alert('Success', 'Item deleted');
+                            loadMenu();
+                        } catch (error) {
+                            Alert.alert('Error', 'Failed to delete');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const openAddModal = () => {
+        setEditingItem(null);
+        setForm({
+            name: '',
+            description: '',
+            price: '',
+            rating: '4.5',
+            calories: '500',
+            protein: '20',
+            stock: '10',
+            image_url: '',
+        });
+        setShowAddEditModal(true);
+    };
+
+    const openEditModal = (item: MenuItem) => {
+        setEditingItem(item);
+        setForm({
+            name: item.name,
+            description: item.description,
+            price: item.price.toString(),
+            rating: item.rating.toString(),
+            calories: item.calories.toString(),
+            protein: item.protein.toString(),
+            stock: (item.stock || 0).toString(),
+            image_url: item.image_url,
+        });
+        setShowAddEditModal(true);
+    };
+
+    const pickImage = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets[0]) {
+            setForm(prev => ({ ...prev, image_url: result.assets[0].uri }));
+        }
+    };
+
+    const handleSave = async () => {
+        if (!form.name.trim()) {
+            return Alert.alert('Error', 'Please enter item name');
+        }
+        if (!form.price || isNaN(Number(form.price))) {
+            return Alert.alert('Error', 'Please enter valid price');
+        }
+        if (!form.stock || isNaN(Number(form.stock))) {
+            return Alert.alert('Error', 'Please enter valid stock');
+        }
+
+        try {
+            setLoading(true);
+
+            let imageUrl = form.image_url;
+
+            if (imageUrl.startsWith('file://')) {
+                const response = await fetch(imageUrl);
+                const blob = await response.blob();
+                
+                const fileId = ID.unique();
+                const file = await storage.createFile(
+                    appwriteConfig.bucketId,
+                    fileId,
+                    {
+                        name: `menu-${Date.now()}.jpg`,
+                        type: 'image/jpeg',
+                        size: blob.size,
+                        uri: imageUrl,
+                    }
+                );
+
+                imageUrl = `${appwriteConfig.endpoint}/storage/buckets/${appwriteConfig.bucketId}/files/${file.$id}/view?project=${appwriteConfig.projectId}`;
+            }
+
+            const data: any = {
+                name: form.name.trim(),
+                description: form.description.trim(),
+                price: Number(form.price),
+                rating: Number(form.rating) || 4.5,
+                calories: Number(form.calories) || 500,
+                protein: Number(form.protein) || 20,
+                stock: Number(form.stock) || 0,
+                image_url: imageUrl,
+            };
+
+            // ✅ Only set available=true for NEW items
+            if (!editingItem) {
+                data.available = true;
+            }
+
+            if (editingItem) {
+                await databases.updateDocument(
+                    appwriteConfig.databaseId,
+                    appwriteConfig.menuCollectionId,
+                    editingItem.$id,
+                    data
+                );
+                Alert.alert('Success', 'Item updated');
+            } else {
+                await databases.createDocument(
+                    appwriteConfig.databaseId,
+                    appwriteConfig.menuCollectionId,
+                    ID.unique(),
+                    data
+                );
+                Alert.alert('Success', 'Item added');
+            }
+
+            setShowAddEditModal(false);
+            loadMenu();
+        } catch (error: any) {
+            console.error('Save error:', error);
+            Alert.alert('Error', error.message || 'Failed to save');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#F5F5F5' }}>
+            <View style={{ padding: 20, paddingBottom: 0 }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#FE8C00' }}>
+                    MENU MANAGEMENT
+                </Text>
+                <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#181C2E', marginTop: 4 }}>
+                    All Items
+                </Text>
+                
+                <View style={{ flexDirection: 'row', marginTop: 16, gap: 12 }}>
+                    <View style={{ flex: 1, backgroundColor: 'white', borderRadius: 12, padding: 12 }}>
+                        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#181C2E' }}>
+                            {menuItems.length}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#878787' }}>Total Items</Text>
+                    </View>
+                    <View style={{ flex: 1, backgroundColor: 'white', borderRadius: 12, padding: 12 }}>
+                        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#181C2E' }}>
+                            {menuItems.filter(i => i.stock === 0).length}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#878787' }}>Sold Out</Text>
+                    </View>
+                </View>
+            </View>
+
+            <ScrollView
+                style={{ flex: 1, marginTop: 20 }}
+                contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
+                refreshControl={
+                    <RefreshControl refreshing={loading} onRefresh={loadMenu} />
+                }
+            >
+                {menuItems.map((item) => {
+                    const isSoldOut = item.stock === 0;
+                    
+                    return (
+                        <View
+                            key={item.$id}
+                            style={{
+                                backgroundColor: 'white',
+                                borderRadius: 16,
+                                padding: 12,
+                                marginBottom: 12,
+                                flexDirection: 'row',
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.1,
+                                shadowRadius: 4,
+                                elevation: 2,
+                                opacity: isSoldOut ? 0.6 : 1,
+                            }}
+                        >
+                            <View style={{ position: 'relative' }}>
+                                <Image
+                                    source={{ uri: item.image_url }}
+                                    style={{ 
+                                        width: 80, 
+                                        height: 80, 
+                                        borderRadius: 12, 
+                                        marginRight: 12,
+                                        opacity: isSoldOut ? 0.5 : 1,
+                                    }}
+                                />
+                                {isSoldOut && (
+                                    <View style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        right: 12,
+                                        bottom: 0,
+                                        backgroundColor: 'rgba(241, 65, 65, 0.9)',
+                                        borderRadius: 12,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}>
+                                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: 'white' }}>
+                                            SOLD OUT
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
+
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#181C2E', marginBottom: 4 }}>
+                                    {item.name}
+                                </Text>
+                                <Text style={{ fontSize: 14, color: '#878787', marginBottom: 4 }}>
+                                    ⭐ {item.rating} • {item.calories} cal • Stock: {item.stock}
+                                </Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#FE8C00' }}>
+                                        {item.price.toLocaleString('vi-VN')}đ
+                                    </Text>
+                                    
+                                    <TouchableOpacity
+                                        style={{
+                                            backgroundColor: item.available ? '#2F9B65' : '#F14141',
+                                            paddingHorizontal: 12,
+                                            paddingVertical: 6,
+                                            borderRadius: 8,
+                                        }}
+                                        onPress={() => toggleAvailability(item.$id, item.available, item.name)}
+                                    >
+                                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: 'white' }}>
+                                            {item.available ? '🔒 Pause' : '✅ Resume'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <View style={{ flexDirection: 'row', gap: 8 }}>
+                                    <TouchableOpacity
+                                        onPress={() => openEditModal(item)}
+                                        style={{
+                                            flex: 1,
+                                            backgroundColor: '#FE8C00',
+                                            borderRadius: 8,
+                                            paddingVertical: 8,
+                                            alignItems: 'center',
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: 'white' }}>
+                                            ✏️ Edit
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => handleDelete(item)}
+                                        style={{
+                                            flex: 1,
+                                            backgroundColor: '#F14141',
+                                            borderRadius: 8,
+                                            paddingVertical: 8,
+                                            alignItems: 'center',
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: 'white' }}>
+                                            🗑️ Delete
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                    );
+                })}
+
+                <TouchableOpacity
+                    style={{
+                        backgroundColor: '#FE8C00',
+                        borderRadius: 16,
+                        padding: 20,
+                        alignItems: 'center',
+                        marginTop: 8,
+                    }}
+                    onPress={openAddModal}
+                >
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'white' }}>
+                        + Add New Item
+                    </Text>
+                </TouchableOpacity>
+            </ScrollView>
+
+            <Modal visible={showAddEditModal} animationType="slide" transparent>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+                    <View style={{ 
+                        backgroundColor: 'white', 
+                        borderTopLeftRadius: 30, 
+                        borderTopRightRadius: 30, 
+                        paddingTop: 20,
+                        paddingHorizontal: 20,
+                        paddingBottom: 40,
+                        maxHeight: '90%',
+                    }}>
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#181C2E', marginBottom: 20 }}>
+                                {editingItem ? '✏️ Edit Item' : '➕ Add New Item'}
+                            </Text>
+
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: '#878787', marginBottom: 8 }}>
+                                Item Image *
+                            </Text>
+                            <TouchableOpacity
+                                onPress={pickImage}
+                                style={{
+                                    backgroundColor: '#F5F5F5',
+                                    borderRadius: 12,
+                                    padding: 20,
+                                    alignItems: 'center',
+                                    marginBottom: 16,
+                                }}
+                            >
+                                {form.image_url ? (
+                                    <Image
+                                        source={{ uri: form.image_url }}
+                                        style={{ width: 120, height: 120, borderRadius: 12 }}
+                                    />
+                                ) : (
+                                    <View style={{ alignItems: 'center' }}>
+                                        <Text style={{ fontSize: 40, marginBottom: 8 }}>📷</Text>
+                                        <Text style={{ color: '#878787' }}>Tap to select image</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: '#878787', marginBottom: 8 }}>
+                                Item Name *
+                            </Text>
+                            <TextInput
+                                style={{ backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, marginBottom: 16, fontSize: 16 }}
+                                placeholder="e.g., Cheese Burger"
+                                value={form.name}
+                                onChangeText={(text) => setForm(prev => ({ ...prev, name: text }))}
+                            />
+
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: '#878787', marginBottom: 8 }}>
+                                Description
+                            </Text>
+                            <TextInput
+                                style={{ backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, marginBottom: 16, fontSize: 16, minHeight: 80 }}
+                                placeholder="Detailed description..."
+                                value={form.description}
+                                onChangeText={(text) => setForm(prev => ({ ...prev, description: text }))}
+                                multiline
+                                numberOfLines={3}
+                            />
+
+                            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#878787', marginBottom: 8 }}>
+                                        Price (đ) *
+                                    </Text>
+                                    <TextInput
+                                        style={{ backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, fontSize: 16 }}
+                                        placeholder="45000"
+                                        value={form.price}
+                                        onChangeText={(text) => setForm(prev => ({ ...prev, price: text }))}
+                                        keyboardType="numeric"
+                                    />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#878787', marginBottom: 8 }}>
+                                        Stock Quantity *
+                                    </Text>
+                                    <TextInput
+                                        style={{ backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, fontSize: 16 }}
+                                        placeholder="10"
+                                        value={form.stock}
+                                        onChangeText={(text) => setForm(prev => ({ ...prev, stock: text }))}
+                                        keyboardType="numeric"
+                                    />
+                                </View>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#878787', marginBottom: 8 }}>
+                                        Rating
+                                    </Text>
+                                    <TextInput
+                                        style={{ backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, fontSize: 16 }}
+                                        placeholder="4.5"
+                                        value={form.rating}
+                                        onChangeText={(text) => setForm(prev => ({ ...prev, rating: text }))}
+                                        keyboardType="numeric"
+                                    />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#878787', marginBottom: 8 }}>
+                                        Calories
+                                    </Text>
+                                    <TextInput
+                                        style={{ backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, fontSize: 16 }}
+                                        placeholder="500"
+                                        value={form.calories}
+                                        onChangeText={(text) => setForm(prev => ({ ...prev, calories: text }))}
+                                        keyboardType="numeric"
+                                    />
+                                </View>
+                            </View>
+
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: '#878787', marginBottom: 8 }}>
+                                Protein (g)
+                            </Text>
+                            <TextInput
+                                style={{ backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, marginBottom: 20, fontSize: 16 }}
+                                placeholder="20"
+                                value={form.protein}
+                                onChangeText={(text) => setForm(prev => ({ ...prev, protein: text }))}
+                                keyboardType="numeric"
+                            />
+
+                            <TouchableOpacity
+                                onPress={handleSave}
+                                disabled={loading}
+                                style={{
+                                    backgroundColor: loading ? '#CCC' : '#FE8C00',
+                                    borderRadius: 12,
+                                    padding: 16,
+                                    alignItems: 'center',
+                                    marginBottom: 12,
+                                }}
+                            >
+                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'white' }}>
+                                    {editingItem ? '💾 Update' : '➕ Add Item'}
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => setShowAddEditModal(false)}
+                                style={{
+                                    backgroundColor: '#F5F5F5',
+                                    borderRadius: 12,
+                                    padding: 16,
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#878787' }}>
+                                    Cancel
+                                </Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+        </SafeAreaView>
+    );
+};
+
+export default AdminMenu;

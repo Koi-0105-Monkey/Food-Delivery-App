@@ -9,7 +9,9 @@ export interface MenuItem extends Models.Document {
     protein: number;
     rating: number;
     type: string;
-    tabs?: string; // Combo tabs (format: "1,2" for multiple combos, or "1" for single combo)
+    tabs?: string;
+    stock: number;
+    available: boolean;
 }
 
 export interface Category extends Models.Document {
@@ -22,6 +24,7 @@ export interface User extends Models.Document {
     email: string;
     avatar: string;
     phone: string;
+    role: 'user' | 'admin';
 }
 
 export interface Address {

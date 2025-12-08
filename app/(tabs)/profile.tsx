@@ -1,7 +1,7 @@
-// app/(tabs)/profile.tsx - ENHANCED WITH PENDING & COMPLETED ORDERS
+// app/(tabs)/profile.tsx - FIXED: Auto redirect admin on app start
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, ScrollView, TouchableOpacity, Alert, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import useAuthStore from '@/store/auth.store';
@@ -28,18 +28,27 @@ const ProfileField = ({ label, value, icon }: { label: string; value: string; ic
 );
 
 const Profile = () => {
-    const { user, setIsAuthenticated, setUser } = useAuthStore();
+    const { user, setIsAuthenticated, setUser, isAdmin } = useAuthStore();
     const { defaultAddress, getDisplayAddress, fetchAddresses } = useAddressStore();
+    
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [showAddressListModal, setShowAddressListModal] = useState(false);
     const [showAddEditModal, setShowAddEditModal] = useState(false);
     const [editingAddress, setEditingAddress] = useState<Address | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
     
-    // ✅ Order History State - Check if has orders (for showing buttons)
+    // Order History State
     const [hasPendingOrders, setHasPendingOrders] = useState(false);
     const [hasCompletedOrders, setHasCompletedOrders] = useState(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+    // ✅ AUTO REDIRECT ADMIN ON APP START
+    useEffect(() => {
+        if (user && isAdmin) {
+            console.log('🔐 Admin detected, redirecting to dashboard...');
+            router.replace('/admin/dashboard');
+        }
+    }, [user, isAdmin]);
 
     useEffect(() => {
         if (user) {
@@ -47,7 +56,6 @@ const Profile = () => {
         }
     }, [user]);
 
-    // ✅ Refresh orders count when screen is focused
     useFocusEffect(
         React.useCallback(() => {
             if (user) {
@@ -56,14 +64,12 @@ const Profile = () => {
         }, [user])
     );
 
-    // ✅ Check orders count (silently, no logs)
     const checkOrdersCount = async () => {
         if (!user) return;
         
         try {
             const userOrders = await getUserOrders(user.$id);
             
-            // Split orders into pending and completed
             const pending = userOrders.filter(order => 
                 order.payment_status === 'pending' || 
                 order.payment_status === 'failed'
@@ -76,7 +82,6 @@ const Profile = () => {
             setHasPendingOrders(pending.length > 0);
             setHasCompletedOrders(completed.length > 0);
             
-            // Only log on initial app load
             if (isInitialLoad) {
                 console.log(`✅ Loaded ${pending.length} pending, ${completed.length} completed orders`);
                 setIsInitialLoad(false);
@@ -154,7 +159,6 @@ const Profile = () => {
         }, 300);
     };
 
-    // ✅ Navigate to orders screen
     const handleViewOrders = (type: 'pending' | 'completed') => {
         router.push(`/orders?type=${type}`);
     };
@@ -294,7 +298,7 @@ const Profile = () => {
                         </TouchableOpacity>
                     )}
 
-                    {/* ✅ Order History Buttons */}
+                    {/* Order History Buttons */}
                     {(hasPendingOrders || hasCompletedOrders) && (
                         <View className="mt-4">
                             <Text className="base-bold text-dark-100 mb-4">📦 Order History</Text>
