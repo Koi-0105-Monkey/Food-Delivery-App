@@ -57,6 +57,7 @@ export default function AdminLayout() {
                 },
                 tabBarLabelStyle: {
                     fontWeight: "600",
+                    fontSize:8,
                     top: 15,
                 },
             }}
@@ -97,7 +98,7 @@ export default function AdminLayout() {
                 name="analytics"
                 options={{
                     tabBarIcon: ({ focused }) => (
-                        <AdminTabIcon icon={images.dollar} focused={focused} />
+                        <AdminTabIcon icon={images.chart} focused={focused} />
                     ),
                 }}
             />

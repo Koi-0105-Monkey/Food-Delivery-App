@@ -1,4 +1,5 @@
-// app/admin/orders.tsx
+// app/admin/orders.tsx - FIXED VERSION WITH WORKING ACTIONS
+
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,7 +9,7 @@ import { Query } from 'react-native-appwrite';
 const AdminOrders = () => {
     const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState<'all' | 'pending' | 'paid' | 'cancelled'>('all');
+    const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('all');
 
     useEffect(() => {
         loadOrders();
@@ -20,8 +21,9 @@ const AdminOrders = () => {
             
             let queries = [Query.orderDesc('$createdAt'), Query.limit(50)];
             
+            // ✅ Filter by order_status instead of payment_status
             if (filter !== 'all') {
-                queries.push(Query.equal('payment_status', filter));
+                queries.push(Query.equal('order_status', filter));
             }
 
             const result = await databases.listDocuments(
@@ -38,29 +40,94 @@ const AdminOrders = () => {
         }
     };
 
-    const updateOrderStatus = async (orderId: string, status: string) => {
-        try {
-            await databases.updateDocument(
-                appwriteConfig.databaseId,
-                appwriteConfig.ordersCollectionId,
-                orderId,
-                { order_status: status }
-            );
-            
-            Alert.alert('Success', `Order status updated to ${status}`);
-            loadOrders();
-        } catch (error) {
-            Alert.alert('Error', 'Failed to update order status');
-        }
+    /**
+     * ✅ Confirm Order - Update to confirmed + Add to revenue
+     */
+    const handleConfirmOrder = async (order: any) => {
+        Alert.alert(
+            'Confirm Order',
+            `Confirm order ${order.order_number}?\n\nAmount: ${order.total.toLocaleString('vi-VN')}đ will be added to revenue.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Confirm',
+                    onPress: async () => {
+                        try {
+                            // Update order status to confirmed
+                            await databases.updateDocument(
+                                appwriteConfig.databaseId,
+                                appwriteConfig.ordersCollectionId,
+                                order.$id,
+                                { 
+                                    order_status: 'confirmed',
+                                    payment_status: 'paid', // ✅ Mark as paid to count in revenue
+                                }
+                            );
+                            
+                            Alert.alert(
+                                'Success',
+                                `Order ${order.order_number} confirmed!\n💰 ${order.total.toLocaleString('vi-VN')}đ added to revenue.`
+                            );
+                            loadOrders();
+                        } catch (error: any) {
+                            Alert.alert('Error', error.message || 'Failed to confirm order');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    /**
+     * ✅ Cancel Order - Update to cancelled
+     */
+    const handleCancelOrder = async (order: any) => {
+        Alert.alert(
+            'Cancel Order',
+            `Are you sure you want to cancel order ${order.order_number}?`,
+            [
+                { text: 'No', style: 'cancel' },
+                {
+                    text: 'Yes, Cancel',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await databases.updateDocument(
+                                appwriteConfig.databaseId,
+                                appwriteConfig.ordersCollectionId,
+                                order.$id,
+                                { 
+                                    order_status: 'cancelled',
+                                    payment_status: 'failed', // Don't count in revenue
+                                }
+                            );
+                            
+                            Alert.alert('Success', `Order ${order.order_number} cancelled`);
+                            loadOrders();
+                        } catch (error: any) {
+                            Alert.alert('Error', error.message || 'Failed to cancel order');
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'paid': return '#2F9B65';
+            case 'confirmed': return '#2F9B65';
             case 'pending': return '#FE8C00';
-            case 'failed': return '#F14141';
-            case 'cancelled': return '#878787';
+            case 'cancelled': return '#F14141';
             default: return '#878787';
+        }
+    };
+
+    const getStatusLabel = (status: string) => {
+        switch (status) {
+            case 'pending': return '⏳ Pending';
+            case 'confirmed': return '✓ Confirmed';
+            case 'cancelled': return '✕ Cancelled';
+            default: return status;
         }
     };
 
@@ -105,7 +172,7 @@ const AdminOrders = () => {
                 >
                     <FilterButton label="All" value="all" />
                     <FilterButton label="Pending" value="pending" />
-                    <FilterButton label="Paid" value="paid" />
+                    <FilterButton label="Confirmed" value="confirmed" />
                     <FilterButton label="Cancelled" value="cancelled" />
                 </ScrollView>
             </View>
@@ -149,7 +216,7 @@ const AdminOrders = () => {
                                 </View>
                                 <View
                                     style={{
-                                        backgroundColor: getStatusColor(order.payment_status) + '20',
+                                        backgroundColor: getStatusColor(order.order_status) + '20',
                                         paddingHorizontal: 12,
                                         paddingVertical: 6,
                                         borderRadius: 12,
@@ -159,10 +226,10 @@ const AdminOrders = () => {
                                         style={{
                                             fontSize: 12,
                                             fontWeight: 'bold',
-                                            color: getStatusColor(order.payment_status),
+                                            color: getStatusColor(order.order_status),
                                         }}
                                     >
-                                        {order.payment_status.toUpperCase()}
+                                        {getStatusLabel(order.order_status)}
                                     </Text>
                                 </View>
                             </View>
@@ -189,8 +256,8 @@ const AdminOrders = () => {
                                 </View>
                             </View>
 
-                            {/* Actions */}
-                            {order.payment_status === 'pending' && (
+                            {/* ✅ Actions - Only show for pending orders */}
+                            {order.order_status === 'pending' && (
                                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
                                     <TouchableOpacity
                                         style={{
@@ -200,7 +267,7 @@ const AdminOrders = () => {
                                             paddingVertical: 10,
                                             alignItems: 'center',
                                         }}
-                                        onPress={() => updateOrderStatus(order.$id, 'confirmed')}
+                                        onPress={() => handleConfirmOrder(order)}
                                     >
                                         <Text style={{ fontSize: 14, fontWeight: 'bold', color: 'white' }}>
                                             ✓ Confirm
@@ -214,12 +281,26 @@ const AdminOrders = () => {
                                             paddingVertical: 10,
                                             alignItems: 'center',
                                         }}
-                                        onPress={() => updateOrderStatus(order.$id, 'cancelled')}
+                                        onPress={() => handleCancelOrder(order)}
                                     >
                                         <Text style={{ fontSize: 14, fontWeight: 'bold', color: 'white' }}>
                                             ✕ Cancel
                                         </Text>
                                     </TouchableOpacity>
+                                </View>
+                            )}
+
+                            {/* ✅ Show revenue status for confirmed orders */}
+                            {order.order_status === 'confirmed' && (
+                                <View style={{ 
+                                    marginTop: 12, 
+                                    backgroundColor: '#E8F5E9', 
+                                    padding: 10, 
+                                    borderRadius: 8 
+                                }}>
+                                    <Text style={{ fontSize: 12, color: '#2F9B65', textAlign: 'center' }}>
+                                        💰 Counted in revenue
+                                    </Text>
                                 </View>
                             )}
                         </View>
