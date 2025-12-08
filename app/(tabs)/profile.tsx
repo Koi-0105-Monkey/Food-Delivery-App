@@ -1,7 +1,7 @@
-// app/(tabs)/profile.tsx - FIXED VERSION (Xóa debug code)
+// app/(tabs)/profile.tsx - FIXED: Auto redirect admin on app start
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, ScrollView, TouchableOpacity, Alert, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import useAuthStore from '@/store/auth.store';
@@ -14,9 +14,6 @@ import AddEditAddressModal from '@/components/AddEditAddressModal';
 import EditProfileModal from '@/components/EditProfileModal';
 import { Address } from '@/store/address.store';
 import { getUserOrders } from '@/lib/payment';
-
-// ✅ FIXED: Xóa debug code dòng 18-42
-// ❌ const { user } = useAuthStore(); // Hook ngoài component
 
 const ProfileField = ({ label, value, icon }: { label: string; value: string; icon: any }) => (
     <View className="profile-field">
@@ -31,8 +28,7 @@ const ProfileField = ({ label, value, icon }: { label: string; value: string; ic
 );
 
 const Profile = () => {
-    // ✅ CORRECT: Hook calls inside component
-    const { user, setIsAuthenticated, setUser } = useAuthStore();
+    const { user, setIsAuthenticated, setUser, isAdmin } = useAuthStore();
     const { defaultAddress, getDisplayAddress, fetchAddresses } = useAddressStore();
     
     const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -45,6 +41,14 @@ const Profile = () => {
     const [hasPendingOrders, setHasPendingOrders] = useState(false);
     const [hasCompletedOrders, setHasCompletedOrders] = useState(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+    // ✅ AUTO REDIRECT ADMIN ON APP START
+    useEffect(() => {
+        if (user && isAdmin) {
+            console.log('🔐 Admin detected, redirecting to dashboard...');
+            router.replace('/admin/dashboard');
+        }
+    }, [user, isAdmin]);
 
     useEffect(() => {
         if (user) {
@@ -333,24 +337,6 @@ const Profile = () => {
                                 </TouchableOpacity>
                             )}
                         </View>
-                    )}
-
-                    {/* 🔧 Admin Panel Button */}
-                    {user?.email === 'admin@fastfood.com' && (
-                        <TouchableOpacity
-                            className="bg-purple-100 border border-purple-500 rounded-2xl p-5 flex-row items-center justify-between mb-3"
-                            onPress={() => router.push('/admin/admin-login')}
-                        >
-                            <View className="flex-row items-center gap-3">
-                                <View className="size-12 rounded-full bg-purple-200 flex-center">
-                                    <Text className="text-2xl">👨‍💼</Text>
-                                </View>
-                                <Text className="paragraph-semibold text-purple-700">
-                                    Access Admin Panel
-                                </Text>
-                            </View>
-                            <Image source={images.arrowRight} className="size-5" resizeMode="contain" tintColor="#8B5CF6" />
-                        </TouchableOpacity>
                     )}
 
                     {/* Logout */}

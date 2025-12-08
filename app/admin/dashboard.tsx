@@ -1,10 +1,12 @@
-// app/admin/dashboard.tsx
+// app/admin/dashboard.tsx - FIXED VERSION
+
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { images } from '@/constants';
 import { databases, appwriteConfig } from '@/lib/appwrite';
 import { Query } from 'react-native-appwrite';
+import { router } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
@@ -240,14 +242,16 @@ const Dashboard = () => {
                     </View>
                 </View>
 
-                {/* Quick Actions */}
+                {/* Quick Actions - FIXED WITH NAVIGATION */}
                 <View style={{ marginTop: 24 }}>
                     <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#181C2E', marginBottom: 16 }}>
                         Quick Actions
                     </Text>
                     
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                        {/* View Orders */}
                         <TouchableOpacity
+                            onPress={() => router.push('/admin/orders')}
                             style={{
                                 flex: 1,
                                 backgroundColor: '#FE8C00',
@@ -263,7 +267,9 @@ const Dashboard = () => {
                             </Text>
                         </TouchableOpacity>
 
+                        {/* Manage Menu */}
                         <TouchableOpacity
+                            onPress={() => router.push('/admin/menu')}
                             style={{
                                 flex: 1,
                                 backgroundColor: '#2F9B65',
@@ -279,7 +285,9 @@ const Dashboard = () => {
                             </Text>
                         </TouchableOpacity>
 
+                        {/* Analytics */}
                         <TouchableOpacity
+                            onPress={() => router.push('/admin/analytics')}
                             style={{
                                 flex: 1,
                                 backgroundColor: '#0EA5E9',
@@ -295,7 +303,9 @@ const Dashboard = () => {
                             </Text>
                         </TouchableOpacity>
 
+                        {/* Customers */}
                         <TouchableOpacity
+                            onPress={() => router.push('/admin/customers')}
                             style={{
                                 flex: 1,
                                 backgroundColor: '#8B5CF6',

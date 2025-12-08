@@ -1,3 +1,5 @@
+// app/admin/_layout.tsx - FIXED: Settings tab cuối cùng
+
 import { Tabs, Redirect } from 'expo-router';
 import { Image, Text, View, ActivityIndicator } from 'react-native';
 import { images } from '@/constants';
@@ -21,7 +23,6 @@ const AdminTabIcon = ({ focused, icon, title }: { focused: boolean; icon: any; t
 export default function AdminLayout() {
     const { isAuthenticated, isAdmin, isLoading } = useAuthStore();
 
-    // ✅ Show loading while checking auth
     if (isLoading) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
@@ -31,7 +32,6 @@ export default function AdminLayout() {
         );
     }
 
-    // ✅ Redirect if not admin
     if (!isAuthenticated || !isAdmin) {
         console.log('🚫 Access denied: Not an admin');
         return <Redirect href="/sign-in" />;
@@ -65,7 +65,7 @@ export default function AdminLayout() {
                 options={{
                     title: 'Dashboard',
                     tabBarIcon: ({ focused }) => (
-                        <AdminTabIcon title="Dashboard" icon={images.home} focused={focused} />
+                        <AdminTabIcon title="Dasht" icon={images.home} focused={focused} />
                     ),
                 }}
             />
@@ -74,7 +74,7 @@ export default function AdminLayout() {
                 options={{
                     title: 'Orders',
                     tabBarIcon: ({ focused }) => (
-                        <AdminTabIcon title="Orders" icon={images.bag} focused={focused} />
+                        <AdminTabIcon title="Order" icon={images.bag} focused={focused} />
                     ),
                 }}
             />
@@ -92,7 +92,7 @@ export default function AdminLayout() {
                 options={{
                     title: 'Analytics',
                     tabBarIcon: ({ focused }) => (
-                        <AdminTabIcon title="Analytics" icon={images.dollar} focused={focused} />
+                        <AdminTabIcon title="Analy" icon={images.dollar} focused={focused} />
                     ),
                 }}
             />
@@ -101,8 +101,16 @@ export default function AdminLayout() {
                 options={{
                     title: 'Settings',
                     tabBarIcon: ({ focused }) => (
-                        <AdminTabIcon title="Settings" icon={images.person} focused={focused} />
+                        <AdminTabIcon title="Settin" icon={images.person} focused={focused} />
                     ),
+                }}
+            />
+            
+            {/* Hidden tab - accessible via navigation only */}
+            <Tabs.Screen
+                name="customers"
+                options={{
+                    href: null, // Hide from tab bar
                 }}
             />
         </Tabs>
