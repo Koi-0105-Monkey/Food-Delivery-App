@@ -1,4 +1,4 @@
-// app/admin/menu.tsx - WITH STOCK MANAGEMENT & SOLD OUT
+// app/admin/menu.tsx - WITH STOCK MANAGEMENT & ENGLISH
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, Alert, RefreshControl, TextInput, Modal } from 'react-native';
@@ -18,7 +18,7 @@ interface MenuItem {
     calories: number;
     protein: number;
     available: boolean;
-    stock: number; // NEW: Stock quantity
+    stock: number;
     categories?: string;
 }
 
@@ -67,15 +67,14 @@ const AdminMenu = () => {
         }
     };
 
-    // ✅ TOGGLE TẠM NGƯNG BÁN / MỞ BÁN
     const toggleAvailability = async (itemId: string, currentStatus: boolean, itemName: string) => {
-        const action = currentStatus ? 'Tạm ngưng bán' : 'Mở bán';
+        const action = currentStatus ? 'Pause Sales' : 'Resume Sales';
         
         Alert.alert(
             action,
-            `Bạn có chắc muốn ${action.toLowerCase()} "${itemName}"?`,
+            `Are you sure you want to ${action.toLowerCase()} for "${itemName}"?`,
             [
-                { text: 'Hủy', style: 'cancel' },
+                { text: 'Cancel', style: 'cancel' },
                 {
                     text: action,
                     onPress: async () => {
@@ -87,10 +86,10 @@ const AdminMenu = () => {
                                 { available: !currentStatus }
                             );
                             
-                            Alert.alert('Thành công', `Đã ${action.toLowerCase()} "${itemName}"`);
+                            Alert.alert('Success', `"${itemName}" is now ${!currentStatus ? 'available' : 'unavailable'}`);
                             loadMenu();
                         } catch (error) {
-                            Alert.alert('Lỗi', 'Không thể cập nhật trạng thái');
+                            Alert.alert('Error', 'Failed to update availability');
                         }
                     },
                 },
@@ -98,15 +97,14 @@ const AdminMenu = () => {
         );
     };
 
-    // ✅ DELETE ITEM
     const handleDelete = (item: MenuItem) => {
         Alert.alert(
-            'Xóa món',
-            `Bạn có chắc muốn xóa "${item.name}"?`,
+            'Delete Item',
+            `Are you sure you want to delete "${item.name}"?`,
             [
-                { text: 'Hủy', style: 'cancel' },
+                { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Xóa',
+                    text: 'Delete',
                     style: 'destructive',
                     onPress: async () => {
                         try {
@@ -115,10 +113,10 @@ const AdminMenu = () => {
                                 appwriteConfig.menuCollectionId,
                                 item.$id
                             );
-                            Alert.alert('Thành công', 'Đã xóa món');
+                            Alert.alert('Success', 'Item deleted');
                             loadMenu();
                         } catch (error) {
-                            Alert.alert('Lỗi', 'Không thể xóa món');
+                            Alert.alert('Error', 'Failed to delete');
                         }
                     },
                 },
@@ -126,7 +124,6 @@ const AdminMenu = () => {
         );
     };
 
-    // ✅ OPEN ADD/EDIT MODAL
     const openAddModal = () => {
         setEditingItem(null);
         setForm({
@@ -157,7 +154,6 @@ const AdminMenu = () => {
         setShowAddEditModal(true);
     };
 
-    // ✅ PICK IMAGE
     const pickImage = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -171,17 +167,15 @@ const AdminMenu = () => {
         }
     };
 
-    // ✅ SAVE (ADD OR UPDATE)
     const handleSave = async () => {
-        // Validation
         if (!form.name.trim()) {
-            return Alert.alert('Lỗi', 'Vui lòng nhập tên món');
+            return Alert.alert('Error', 'Please enter item name');
         }
         if (!form.price || isNaN(Number(form.price))) {
-            return Alert.alert('Lỗi', 'Vui lòng nhập giá hợp lệ');
+            return Alert.alert('Error', 'Please enter valid price');
         }
         if (!form.stock || isNaN(Number(form.stock))) {
-            return Alert.alert('Lỗi', 'Vui lòng nhập số lượng hợp lệ');
+            return Alert.alert('Error', 'Please enter valid stock');
         }
 
         try {
@@ -189,7 +183,6 @@ const AdminMenu = () => {
 
             let imageUrl = form.image_url;
 
-            // Upload image if local file
             if (imageUrl.startsWith('file://')) {
                 const response = await fetch(imageUrl);
                 const blob = await response.blob();
@@ -209,7 +202,7 @@ const AdminMenu = () => {
                 imageUrl = `${appwriteConfig.endpoint}/storage/buckets/${appwriteConfig.bucketId}/files/${file.$id}/view?project=${appwriteConfig.projectId}`;
             }
 
-            const data = {
+            const data: any = {
                 name: form.name.trim(),
                 description: form.description.trim(),
                 price: Number(form.price),
@@ -218,8 +211,12 @@ const AdminMenu = () => {
                 protein: Number(form.protein) || 20,
                 stock: Number(form.stock) || 0,
                 image_url: imageUrl,
-                available: true,
             };
+
+            // ✅ Only set available=true for NEW items
+            if (!editingItem) {
+                data.available = true;
+            }
 
             if (editingItem) {
                 await databases.updateDocument(
@@ -228,7 +225,7 @@ const AdminMenu = () => {
                     editingItem.$id,
                     data
                 );
-                Alert.alert('Thành công', 'Đã cập nhật món');
+                Alert.alert('Success', 'Item updated');
             } else {
                 await databases.createDocument(
                     appwriteConfig.databaseId,
@@ -236,13 +233,14 @@ const AdminMenu = () => {
                     ID.unique(),
                     data
                 );
-                Alert.alert('Thành công', 'Đã thêm món mới');
+                Alert.alert('Success', 'Item added');
             }
 
             setShowAddEditModal(false);
             loadMenu();
         } catch (error: any) {
-            Alert.alert('Lỗi', error.message || 'Không thể lưu món');
+            console.error('Save error:', error);
+            Alert.alert('Error', error.message || 'Failed to save');
         } finally {
             setLoading(false);
         }
@@ -252,25 +250,24 @@ const AdminMenu = () => {
         <SafeAreaView style={{ flex: 1, backgroundColor: '#F5F5F5' }}>
             <View style={{ padding: 20, paddingBottom: 0 }}>
                 <Text style={{ fontSize: 14, fontWeight: '600', color: '#FE8C00' }}>
-                    QUẢN LÝ THỰC ĐƠN
+                    MENU MANAGEMENT
                 </Text>
                 <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#181C2E', marginTop: 4 }}>
-                    Tất cả món ăn
+                    All Items
                 </Text>
                 
-                {/* Stats */}
                 <View style={{ flexDirection: 'row', marginTop: 16, gap: 12 }}>
                     <View style={{ flex: 1, backgroundColor: 'white', borderRadius: 12, padding: 12 }}>
                         <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#181C2E' }}>
                             {menuItems.length}
                         </Text>
-                        <Text style={{ fontSize: 12, color: '#878787' }}>Tổng món</Text>
+                        <Text style={{ fontSize: 12, color: '#878787' }}>Total Items</Text>
                     </View>
                     <View style={{ flex: 1, backgroundColor: 'white', borderRadius: 12, padding: 12 }}>
                         <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#181C2E' }}>
                             {menuItems.filter(i => i.stock === 0).length}
                         </Text>
-                        <Text style={{ fontSize: 12, color: '#878787' }}>Hết hàng</Text>
+                        <Text style={{ fontSize: 12, color: '#878787' }}>Sold Out</Text>
                     </View>
                 </View>
             </View>
@@ -302,7 +299,6 @@ const AdminMenu = () => {
                                 opacity: isSoldOut ? 0.6 : 1,
                             }}
                         >
-                            {/* Image */}
                             <View style={{ position: 'relative' }}>
                                 <Image
                                     source={{ uri: item.image_url }}
@@ -333,20 +329,18 @@ const AdminMenu = () => {
                                 )}
                             </View>
 
-                            {/* Info */}
                             <View style={{ flex: 1 }}>
                                 <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#181C2E', marginBottom: 4 }}>
                                     {item.name}
                                 </Text>
                                 <Text style={{ fontSize: 14, color: '#878787', marginBottom: 4 }}>
-                                    ⭐ {item.rating} • {item.calories} cal • Kho: {item.stock}
+                                    ⭐ {item.rating} • {item.calories} cal • Stock: {item.stock}
                                 </Text>
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                     <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#FE8C00' }}>
                                         {item.price.toLocaleString('vi-VN')}đ
                                     </Text>
                                     
-                                    {/* Toggle Button */}
                                     <TouchableOpacity
                                         style={{
                                             backgroundColor: item.available ? '#2F9B65' : '#F14141',
@@ -357,12 +351,11 @@ const AdminMenu = () => {
                                         onPress={() => toggleAvailability(item.$id, item.available, item.name)}
                                     >
                                         <Text style={{ fontSize: 12, fontWeight: 'bold', color: 'white' }}>
-                                            {item.available ? '🔒 Tạm ngưng' : '✅ Mở bán'}
+                                            {item.available ? '🔒 Pause' : '✅ Resume'}
                                         </Text>
                                     </TouchableOpacity>
                                 </View>
 
-                                {/* Actions */}
                                 <View style={{ flexDirection: 'row', gap: 8 }}>
                                     <TouchableOpacity
                                         onPress={() => openEditModal(item)}
@@ -375,7 +368,7 @@ const AdminMenu = () => {
                                         }}
                                     >
                                         <Text style={{ fontSize: 12, fontWeight: 'bold', color: 'white' }}>
-                                            ✏️ Sửa
+                                            ✏️ Edit
                                         </Text>
                                     </TouchableOpacity>
 
@@ -390,7 +383,7 @@ const AdminMenu = () => {
                                         }}
                                     >
                                         <Text style={{ fontSize: 12, fontWeight: 'bold', color: 'white' }}>
-                                            🗑️ Xóa
+                                            🗑️ Delete
                                         </Text>
                                     </TouchableOpacity>
                                 </View>
@@ -399,7 +392,6 @@ const AdminMenu = () => {
                     );
                 })}
 
-                {/* Add New Button */}
                 <TouchableOpacity
                     style={{
                         backgroundColor: '#FE8C00',
@@ -411,12 +403,11 @@ const AdminMenu = () => {
                     onPress={openAddModal}
                 >
                     <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'white' }}>
-                        + Thêm món mới
+                        + Add New Item
                     </Text>
                 </TouchableOpacity>
             </ScrollView>
 
-            {/* ADD/EDIT MODAL WITH LABELS */}
             <Modal visible={showAddEditModal} animationType="slide" transparent>
                 <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
                     <View style={{ 
@@ -430,12 +421,11 @@ const AdminMenu = () => {
                     }}>
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#181C2E', marginBottom: 20 }}>
-                                {editingItem ? '✏️ Sửa món' : '➕ Thêm món mới'}
+                                {editingItem ? '✏️ Edit Item' : '➕ Add New Item'}
                             </Text>
 
-                            {/* Image Picker */}
                             <Text style={{ fontSize: 14, fontWeight: '600', color: '#878787', marginBottom: 8 }}>
-                                Hình ảnh món ăn *
+                                Item Image *
                             </Text>
                             <TouchableOpacity
                                 onPress={pickImage}
@@ -455,28 +445,27 @@ const AdminMenu = () => {
                                 ) : (
                                     <View style={{ alignItems: 'center' }}>
                                         <Text style={{ fontSize: 40, marginBottom: 8 }}>📷</Text>
-                                        <Text style={{ color: '#878787' }}>Chạm để chọn ảnh</Text>
+                                        <Text style={{ color: '#878787' }}>Tap to select image</Text>
                                     </View>
                                 )}
                             </TouchableOpacity>
 
-                            {/* Form Fields with Labels */}
                             <Text style={{ fontSize: 14, fontWeight: '600', color: '#878787', marginBottom: 8 }}>
-                                Tên món ăn *
+                                Item Name *
                             </Text>
                             <TextInput
                                 style={{ backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, marginBottom: 16, fontSize: 16 }}
-                                placeholder="Ví dụ: Burger phô mai"
+                                placeholder="e.g., Cheese Burger"
                                 value={form.name}
                                 onChangeText={(text) => setForm(prev => ({ ...prev, name: text }))}
                             />
 
                             <Text style={{ fontSize: 14, fontWeight: '600', color: '#878787', marginBottom: 8 }}>
-                                Mô tả
+                                Description
                             </Text>
                             <TextInput
                                 style={{ backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, marginBottom: 16, fontSize: 16, minHeight: 80 }}
-                                placeholder="Mô tả chi tiết về món ăn..."
+                                placeholder="Detailed description..."
                                 value={form.description}
                                 onChangeText={(text) => setForm(prev => ({ ...prev, description: text }))}
                                 multiline
@@ -486,7 +475,7 @@ const AdminMenu = () => {
                             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
                                 <View style={{ flex: 1 }}>
                                     <Text style={{ fontSize: 14, fontWeight: '600', color: '#878787', marginBottom: 8 }}>
-                                        Giá (đ) *
+                                        Price (đ) *
                                     </Text>
                                     <TextInput
                                         style={{ backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, fontSize: 16 }}
@@ -498,7 +487,7 @@ const AdminMenu = () => {
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <Text style={{ fontSize: 14, fontWeight: '600', color: '#878787', marginBottom: 8 }}>
-                                        Số lượng *
+                                        Stock Quantity *
                                     </Text>
                                     <TextInput
                                         style={{ backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, fontSize: 16 }}
@@ -513,7 +502,7 @@ const AdminMenu = () => {
                             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
                                 <View style={{ flex: 1 }}>
                                     <Text style={{ fontSize: 14, fontWeight: '600', color: '#878787', marginBottom: 8 }}>
-                                        Đánh giá
+                                        Rating
                                     </Text>
                                     <TextInput
                                         style={{ backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, fontSize: 16 }}
@@ -548,7 +537,6 @@ const AdminMenu = () => {
                                 keyboardType="numeric"
                             />
 
-                            {/* Buttons */}
                             <TouchableOpacity
                                 onPress={handleSave}
                                 disabled={loading}
@@ -561,7 +549,7 @@ const AdminMenu = () => {
                                 }}
                             >
                                 <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'white' }}>
-                                    {editingItem ? '💾 Cập nhật' : '➕ Thêm món'}
+                                    {editingItem ? '💾 Update' : '➕ Add Item'}
                                 </Text>
                             </TouchableOpacity>
 
@@ -575,7 +563,7 @@ const AdminMenu = () => {
                                 }}
                             >
                                 <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#878787' }}>
-                                    Hủy
+                                    Cancel
                                 </Text>
                             </TouchableOpacity>
                         </ScrollView>

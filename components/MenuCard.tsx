@@ -1,4 +1,4 @@
-// components/MenuCard.tsx - WITH STATUS OVERLAY (Tạm ngưng bán / Sold Out)
+// components/MenuCard.tsx - WITH STOCK & AVAILABLE STATUS
 
 import { Text, TouchableOpacity, Image, Platform, View } from 'react-native';
 import { MenuItem } from '@/type';
@@ -41,12 +41,11 @@ const MenuCard = ({ item }: { item: MenuItem }) => {
     const [showToast, setShowToast] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
 
-    // ✅ Check status
-    const isSoldOut = (item.stock !== undefined && item.stock === 0);
-    const isUnavailable = !item.available;
+    // ✅ Check stock and availability
+    const isSoldOut = item.stock === 0;
+    const isUnavailable = item.available === false;
     const isDisabled = isSoldOut || isUnavailable;
 
-    // Get discounted price
     const getDiscountedPrice = () => {
         if (!item.tabs || item.tabs.trim() === '') {
             return item.price;
@@ -82,9 +81,9 @@ const MenuCard = ({ item }: { item: MenuItem }) => {
         
         if (isDisabled) {
             if (isSoldOut) {
-                showToastNotification('❌ Món này đã hết hàng');
+                showToastNotification('❌ This item is sold out');
             } else {
-                showToastNotification('❌ Món này tạm ngưng bán');
+                showToastNotification('❌ This item is temporarily unavailable');
             }
             return;
         }
@@ -97,7 +96,7 @@ const MenuCard = ({ item }: { item: MenuItem }) => {
             customizations: [] 
         });
 
-        showToastNotification(`✅ ${item.name} đã thêm vào giỏ!`);
+        showToastNotification(`✅ ${item.name} added to cart!`);
     };
 
     const truncateName = (text: string, maxLength: number = 25) => {
@@ -149,7 +148,7 @@ const MenuCard = ({ item }: { item: MenuItem }) => {
                     resizeMode="contain"
                 />
                 
-                {/* ✅ OVERLAY: Tạm ngưng bán hoặc Sold Out */}
+                {/* ✅ OVERLAY: Sold Out or Unavailable */}
                 {isDisabled && (
                     <View
                         style={{
@@ -172,7 +171,7 @@ const MenuCard = ({ item }: { item: MenuItem }) => {
                             }}
                         >
                             <Text style={{ fontSize: 14, fontWeight: 'bold', color: 'white' }}>
-                                {isSoldOut ? '🚫 SOLD OUT' : '⏸️ TẠM NGƯNG'}
+                                {isSoldOut ? '🚫 SOLD OUT' : '⏸️ UNAVAILABLE'}
                             </Text>
                         </View>
                     </View>
@@ -261,7 +260,7 @@ const MenuCard = ({ item }: { item: MenuItem }) => {
                     className="flex-1 bg-primary/10 py-2 rounded-lg"
                 >
                     <Text className="paragraph-bold text-primary text-center">
-                        Chi tiết
+                        Details
                     </Text>
                 </TouchableOpacity>
 

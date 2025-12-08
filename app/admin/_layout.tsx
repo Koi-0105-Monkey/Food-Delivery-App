@@ -6,19 +6,20 @@ import { images } from '@/constants';
 import useAuthStore from '@/store/auth.store';
 
 const AdminTabIcon = ({ focused, icon }: { focused: boolean; icon: any }) => (
-    <View style={{ 
-        width: 50, 
-        height: 50, 
+    <View style={{
+        width: 50,
+        height: 50,
         borderRadius: 25,
         backgroundColor: focused ? '#FFF5E6' : 'transparent',
         alignItems: 'center',
         justifyContent: 'center',
+        top: 10,
     }}>
-        <Image 
-            source={icon} 
+        <Image
+            source={icon}
             style={{ width: 28, height: 28 }}
-            resizeMode="contain" 
-            tintColor={focused ? '#FE8C00' : '#878787'} 
+            resizeMode="contain"
+            tintColor={focused ? '#FE8C00' : '#878787'}
         />
     </View>
 );
@@ -44,20 +45,19 @@ export default function AdminLayout() {
         <Tabs
             screenOptions={{
                 headerShown: false,
-                tabBarShowLabel: false,
+                tabBarShowLabel: true,
                 tabBarStyle: {
-                    borderTopLeftRadius: 50,
-                    borderTopRightRadius: 50,
-                    marginHorizontal: 20,
+                    borderTopLeftRadius: 40,
+                    borderTopRightRadius: 40,
+                    marginHorizontal: 0,
                     height: 80,
                     position: 'absolute',
-                    bottom: 40,
+                    bottom: 0,
                     backgroundColor: 'white',
-                    shadowColor: '#1a1a1a',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 4,
-                    elevation: 5,
+                },
+                tabBarLabelStyle: {
+                    fontWeight: "600",
+                    top: 15,
                 },
             }}
         >

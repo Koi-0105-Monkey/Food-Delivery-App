@@ -3,17 +3,30 @@ import useAuthStore from '@/store/auth.store';
 import { TabBarIconProps } from '@/type';
 import { ActivityIndicator, Image, Text, View } from 'react-native';
 import { images } from '@/constants';
-import cn from 'clsx';
 
 const TabBarIcon = ({ focused, icon, title }: TabBarIconProps) => (
-    <View className="tab-icon">
+    <View style={{ 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: focused ? '#FFF5E6' : 'transparent',
+    }}>
         <Image 
             source={icon} 
-            className="size-7" 
+            style={{ width: 28, height: 28, marginBottom: 4 }}
             resizeMode="contain" 
-            tintColor={focused ? '#FE8C00' : '#5D5F6D'} 
+            tintColor={focused ? '#FE8C00' : '#878787'} 
         />
-        <Text className={cn('text-sm font-bold', focused ? 'text-primary' : 'text-gray-200')}>
+        <Text 
+            style={{ 
+                fontSize: 11, 
+                fontWeight: '600',
+                color: focused ? '#FE8C00' : '#878787',
+                marginTop: 2,
+            }}
+        >
             {title}
         </Text>
     </View>
@@ -22,7 +35,6 @@ const TabBarIcon = ({ focused, icon, title }: TabBarIconProps) => (
 export default function TabLayout() {
     const { isAuthenticated, isLoading } = useAuthStore();
 
-    // Show loading spinner while checking auth
     if (isLoading) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
@@ -32,7 +44,6 @@ export default function TabLayout() {
         );
     }
 
-    // Redirect to sign-in if not authenticated
     if (!isAuthenticated) {
         console.log('→ Redirecting to sign-in (no active session)');
         return <Redirect href="/sign-in" />;
@@ -46,20 +57,21 @@ export default function TabLayout() {
                 headerShown: false,
                 tabBarShowLabel: false,
                 tabBarStyle: {
-                    borderTopLeftRadius: 50,
-                    borderTopRightRadius: 50,
-                    borderBottomLeftRadius: 50,
-                    borderBottomRightRadius: 50,
-                    marginHorizontal: 20,
-                    height: 80,
                     position: 'absolute',
-                    bottom: 40,
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: 80,
                     backgroundColor: 'white',
-                    shadowColor: '#1a1a1a',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 4,
-                    elevation: 5,
+                    borderTopWidth: 1,
+                    borderTopColor: '#F3F4F6',
+                    paddingBottom: 8,
+                    paddingTop: 8,
+                    elevation: 0,
+                    shadowOpacity: 0,
+                },
+                tabBarItemStyle: {
+                    height: 64,
                 },
             }}
         >

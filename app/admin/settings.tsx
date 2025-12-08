@@ -1,11 +1,15 @@
-// app/admin/settings.tsx
+// app/admin/settings.tsx - FIXED LOGOUT
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { images } from '@/constants';
+import useAuthStore from '@/store/auth.store';
+import { account } from '@/lib/appwrite';
 
 const AdminSettings = () => {
+    const { setIsAuthenticated, setUser } = useAuthStore();
+
     const handleLogout = () => {
         Alert.alert(
             'Logout',
@@ -15,7 +19,22 @@ const AdminSettings = () => {
                 {
                     text: 'Logout',
                     style: 'destructive',
-                    onPress: () => router.replace('/admin/admin-login'),
+                    onPress: async () => {
+                        try {
+                            // ✅ Delete session from Appwrite
+                            await account.deleteSession('current');
+                            
+                            // ✅ Clear auth store
+                            setIsAuthenticated(false);
+                            setUser(null);
+                            
+                            // ✅ Redirect to sign-in
+                            router.replace('/sign-in');
+                        } catch (error) {
+                            console.error('Logout error:', error);
+                            Alert.alert('Error', 'Failed to logout');
+                        }
+                    },
                 },
             ]
         );
@@ -93,7 +112,6 @@ const AdminSettings = () => {
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#F5F5F5' }}>
             <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }}>
-                {/* Header */}
                 <View style={{ marginBottom: 24 }}>
                     <Text style={{ fontSize: 14, fontWeight: '600', color: '#FE8C00' }}>
                         SETTINGS
@@ -103,7 +121,6 @@ const AdminSettings = () => {
                     </Text>
                 </View>
 
-                {/* Admin Info */}
                 <View
                     style={{
                         backgroundColor: 'white',
@@ -139,7 +156,6 @@ const AdminSettings = () => {
                     </Text>
                 </View>
 
-                {/* Store Settings */}
                 <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#181C2E', marginBottom: 12 }}>
                     Store Settings
                 </Text>
@@ -165,7 +181,6 @@ const AdminSettings = () => {
                     onPress={() => Alert.alert('Coming Soon', 'Payment methods settings')}
                 />
 
-                {/* App Settings */}
                 <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#181C2E', marginTop: 24, marginBottom: 12 }}>
                     App Settings
                 </Text>
@@ -184,7 +199,6 @@ const AdminSettings = () => {
                     onPress={() => Alert.alert('Coming Soon', 'Admin users management')}
                 />
 
-                {/* Danger Zone */}
                 <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#F14141', marginTop: 24, marginBottom: 12 }}>
                     Danger Zone
                 </Text>
@@ -197,7 +211,6 @@ const AdminSettings = () => {
                     danger
                 />
 
-                {/* Version Info */}
                 <View style={{ alignItems: 'center', marginTop: 40 }}>
                     <Text style={{ fontSize: 14, color: '#878787' }}>FastFood Admin Panel</Text>
                     <Text style={{ fontSize: 12, color: '#878787', marginTop: 4 }}>Version 1.0.0</Text>
