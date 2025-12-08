@@ -1,4 +1,4 @@
-// components/MenuCard.tsx - FIXED VERSION WITH TEXT TRUNCATION
+// components/MenuCard.tsx - WITH STATUS OVERLAY (Tạm ngưng bán / Sold Out)
 
 import { Text, TouchableOpacity, Image, Platform, View } from 'react-native';
 import { MenuItem } from '@/type';
@@ -7,7 +7,6 @@ import { router } from 'expo-router';
 import { images } from '@/constants';
 import { useState } from 'react';
 
-// ✅ Toast Component (inline)
 const MiniToast = ({ visible, message }: { visible: boolean; message: string }) => {
     if (!visible) return null;
     
@@ -37,31 +36,36 @@ const MiniToast = ({ visible, message }: { visible: boolean; message: string }) 
     );
 };
 
-const MenuCard = ({ item: { $id, image_url, name, price, rating, tabs } }: { item: MenuItem }) => {
+const MenuCard = ({ item }: { item: MenuItem }) => {
     const { addItem } = useCartStore();
     const [showToast, setShowToast] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
 
-    // ✅ COMBO DISCOUNT LOGIC
+    // ✅ Check status
+    const isSoldOut = (item.stock !== undefined && item.stock === 0);
+    const isUnavailable = !item.available;
+    const isDisabled = isSoldOut || isUnavailable;
+
+    // Get discounted price
     const getDiscountedPrice = () => {
-        if (!tabs || tabs.trim() === '') {
-            return price;
+        if (!item.tabs || item.tabs.trim() === '') {
+            return item.price;
         }
 
-        const comboIds = tabs.split(',').map(id => id.trim()).filter(Boolean);
+        const comboIds = item.tabs.split(',').map(id => id.trim()).filter(Boolean);
         
         if (comboIds.length >= 2) {
-            return price * 0.8;
+            return item.price * 0.8;
         } else if (comboIds.length === 1) {
-            return price * 0.85;
+            return item.price * 0.85;
         }
 
-        return price;
+        return item.price;
     };
 
     const discountedPrice = getDiscountedPrice();
-    const hasDiscount = discountedPrice < price;
-    const discountPercent = hasDiscount ? Math.round(((price - discountedPrice) / price) * 100) : 0;
+    const hasDiscount = discountedPrice < item.price;
+    const discountPercent = hasDiscount ? Math.round(((item.price - discountedPrice) / item.price) * 100) : 0;
 
     const showToastNotification = (message: string) => {
         setToastMessage(message);
@@ -70,24 +74,32 @@ const MenuCard = ({ item: { $id, image_url, name, price, rating, tabs } }: { ite
     };
 
     const handleViewDetail = () => {
-        router.push(`/product/${$id}` as any);
+        router.push(`/product/${item.$id}` as any);
     };
 
     const handleQuickAdd = (e: any) => {
         e.stopPropagation();
         
+        if (isDisabled) {
+            if (isSoldOut) {
+                showToastNotification('❌ Món này đã hết hàng');
+            } else {
+                showToastNotification('❌ Món này tạm ngưng bán');
+            }
+            return;
+        }
+        
         addItem({ 
-            id: $id, 
-            name, 
+            id: item.$id, 
+            name: item.name, 
             price: discountedPrice,
-            image_url, 
+            image_url: item.image_url, 
             customizations: [] 
         });
 
-        showToastNotification(`✅ ${name} added to cart!`);
+        showToastNotification(`✅ ${item.name} đã thêm vào giỏ!`);
     };
 
-    // ✅ FIX: Truncate long names
     const truncateName = (text: string, maxLength: number = 25) => {
         if (text.length <= maxLength) return text;
         return text.substring(0, maxLength - 3) + '...';
@@ -108,11 +120,11 @@ const MenuCard = ({ item: { $id, image_url, name, price, rating, tabs } }: { ite
                 shadowRadius: 8,
                 ...(Platform.OS === 'android' && { elevation: 5 }),
                 minHeight: 260,
+                opacity: isDisabled ? 0.7 : 1,
             }}
             onPress={handleViewDetail}
             activeOpacity={0.7}
         >
-            {/* Toast Notification */}
             <MiniToast visible={showToast} message={toastMessage} />
 
             {/* Product Image */}
@@ -128,17 +140,47 @@ const MenuCard = ({ item: { $id, image_url, name, price, rating, tabs } }: { ite
                 }}
             >
                 <Image
-                    source={{ uri: image_url }}
+                    source={{ uri: item.image_url }}
                     style={{ 
                         width: 120, 
                         height: 120,
+                        opacity: isDisabled ? 0.5 : 1,
                     }}
                     resizeMode="contain"
                 />
+                
+                {/* ✅ OVERLAY: Tạm ngưng bán hoặc Sold Out */}
+                {isDisabled && (
+                    <View
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                    >
+                        <View
+                            style={{
+                                backgroundColor: isSoldOut ? '#F14141' : '#FE8C00',
+                                paddingHorizontal: 16,
+                                paddingVertical: 8,
+                                borderRadius: 20,
+                                transform: [{ rotate: '-15deg' }],
+                            }}
+                        >
+                            <Text style={{ fontSize: 14, fontWeight: 'bold', color: 'white' }}>
+                                {isSoldOut ? '🚫 SOLD OUT' : '⏸️ TẠM NGƯNG'}
+                            </Text>
+                        </View>
+                    </View>
+                )}
             </View>
 
             {/* Discount Badge */}
-            {hasDiscount && (
+            {hasDiscount && !isDisabled && (
                 <View
                     style={{
                         position: 'absolute',
@@ -179,11 +221,11 @@ const MenuCard = ({ item: { $id, image_url, name, price, rating, tabs } }: { ite
                     tintColor="#FE8C00"
                 />
                 <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#181C2E' }}>
-                    {rating}
+                    {item.rating}
                 </Text>
             </View>
 
-            {/* ✅ FIX: Product Name - Truncated with custom function */}
+            {/* Product Name */}
             <Text
                 className="text-center base-bold text-dark-100 mb-2"
                 style={{ 
@@ -191,15 +233,15 @@ const MenuCard = ({ item: { $id, image_url, name, price, rating, tabs } }: { ite
                     lineHeight: 22,
                 }}
             >
-                {truncateName(name, 25)}
+                {truncateName(item.name, 25)}
             </Text>
 
             {/* Price Section */}
             <View style={{ alignItems: 'center', marginBottom: 12 }}>
-                {hasDiscount ? (
+                {hasDiscount && !isDisabled ? (
                     <View style={{ alignItems: 'center' }}>
                         <Text style={{ fontSize: 12, color: '#878787', textDecorationLine: 'line-through' }}>
-                            {price.toLocaleString('vi-VN')}đ
+                            {item.price.toLocaleString('vi-VN')}đ
                         </Text>
                         <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#FE8C00', marginTop: 2 }}>
                             {discountedPrice.toLocaleString('vi-VN')}đ
@@ -207,7 +249,7 @@ const MenuCard = ({ item: { $id, image_url, name, price, rating, tabs } }: { ite
                     </View>
                 ) : (
                     <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#FE8C00' }}>
-                        {price.toLocaleString('vi-VN')}đ
+                        {item.price.toLocaleString('vi-VN')}đ
                     </Text>
                 )}
             </View>
@@ -219,13 +261,21 @@ const MenuCard = ({ item: { $id, image_url, name, price, rating, tabs } }: { ite
                     className="flex-1 bg-primary/10 py-2 rounded-lg"
                 >
                     <Text className="paragraph-bold text-primary text-center">
-                        View Details
+                        Chi tiết
                     </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                     onPress={handleQuickAdd}
-                    className="size-10 bg-primary rounded-lg flex-center"
+                    disabled={isDisabled}
+                    style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 8,
+                        backgroundColor: isDisabled ? '#CCC' : '#FE8C00',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}
                 >
                     <Image
                         source={images.plus}

@@ -1,22 +1,25 @@
-// app/admin/_layout.tsx - FIXED: Settings tab cuối cùng
+// app/admin/_layout.tsx - FINAL: Icon only, uniform size, with Customers tab
 
 import { Tabs, Redirect } from 'expo-router';
-import { Image, Text, View, ActivityIndicator } from 'react-native';
+import { Image, View, ActivityIndicator, Text } from 'react-native';
 import { images } from '@/constants';
-import cn from 'clsx';
 import useAuthStore from '@/store/auth.store';
 
-const AdminTabIcon = ({ focused, icon, title }: { focused: boolean; icon: any; title: string }) => (
-    <View className="items-center justify-center" style={{ marginTop: 12 }}>
+const AdminTabIcon = ({ focused, icon }: { focused: boolean; icon: any }) => (
+    <View style={{ 
+        width: 50, 
+        height: 50, 
+        borderRadius: 25,
+        backgroundColor: focused ? '#FFF5E6' : 'transparent',
+        alignItems: 'center',
+        justifyContent: 'center',
+    }}>
         <Image 
             source={icon} 
-            className="size-7" 
+            style={{ width: 28, height: 28 }}
             resizeMode="contain" 
             tintColor={focused ? '#FE8C00' : '#878787'} 
         />
-        <Text className={cn('text-xs font-bold mt-1', focused ? 'text-primary' : 'text-gray-200')}>
-            {title}
-        </Text>
     </View>
 );
 
@@ -36,8 +39,6 @@ export default function AdminLayout() {
         console.log('🚫 Access denied: Not an admin');
         return <Redirect href="/sign-in" />;
     }
-
-    console.log('✅ Admin access granted');
 
     return (
         <Tabs
@@ -63,54 +64,49 @@ export default function AdminLayout() {
             <Tabs.Screen
                 name="dashboard"
                 options={{
-                    title: 'Dashboard',
                     tabBarIcon: ({ focused }) => (
-                        <AdminTabIcon title="Dasht" icon={images.home} focused={focused} />
+                        <AdminTabIcon icon={images.home} focused={focused} />
                     ),
                 }}
             />
             <Tabs.Screen
                 name="orders"
                 options={{
-                    title: 'Orders',
                     tabBarIcon: ({ focused }) => (
-                        <AdminTabIcon title="Order" icon={images.bag} focused={focused} />
+                        <AdminTabIcon icon={images.bag} focused={focused} />
                     ),
                 }}
             />
             <Tabs.Screen
                 name="menu"
                 options={{
-                    title: 'Menu',
                     tabBarIcon: ({ focused }) => (
-                        <AdminTabIcon title="Menu" icon={images.search} focused={focused} />
+                        <AdminTabIcon icon={images.search} focused={focused} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="customers"
+                options={{
+                    tabBarIcon: ({ focused }) => (
+                        <AdminTabIcon icon={images.user} focused={focused} />
                     ),
                 }}
             />
             <Tabs.Screen
                 name="analytics"
                 options={{
-                    title: 'Analytics',
                     tabBarIcon: ({ focused }) => (
-                        <AdminTabIcon title="Analy" icon={images.dollar} focused={focused} />
+                        <AdminTabIcon icon={images.dollar} focused={focused} />
                     ),
                 }}
             />
             <Tabs.Screen
                 name="settings"
                 options={{
-                    title: 'Settings',
                     tabBarIcon: ({ focused }) => (
-                        <AdminTabIcon title="Settin" icon={images.person} focused={focused} />
+                        <AdminTabIcon icon={images.person} focused={focused} />
                     ),
-                }}
-            />
-            
-            {/* Hidden tab - accessible via navigation only */}
-            <Tabs.Screen
-                name="customers"
-                options={{
-                    href: null, // Hide from tab bar
                 }}
             />
         </Tabs>
