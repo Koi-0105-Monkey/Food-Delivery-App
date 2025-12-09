@@ -141,3 +141,5 @@ Nhánh detail
 chạy 2 file scripts:
 node scripts/upload-customization-images.js
 node scripts/update-customization-images.js
+
+npx expo install react-native-reanimated
