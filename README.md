@@ -78,6 +78,7 @@ npm install express
 npm install qrcode
 npm install vietqr
 npm install express node-appwrite
+npx expo install react-native-chart-kit react-native-svg
 
 ```
 
