@@ -4,11 +4,11 @@
 const sdk = require('node-appwrite');
 
 // ========== CONFIG ==========
-const API_KEY = 'standard_13b9401fd29684bb5adb80d060c6ef703af46eeca76b456181289fdd9ece957a20503d8ef46bfa42bd82aa48433f58181fe12aa42cb8b41066441ea00478cc811cdd4864ceb7c8d7003bdf39a017f5f1842f5963637733fb93b8be984fb4da391f118291ffba6599291c25215468597da58b678716fd41b35e6a240095c95dd1';
-const ENDPOINT = 'https://nyc.cloud.appwrite.io/v1';
-const PROJECT_ID = '69230ad2001fb8f2aee4';
-const DATABASE_ID = '68629ae60038a7c61fe4';
-const BUCKET_ID = '692334a700377dae1061';
+const API_KEY = 'standard_27ffab18f83e031df3a791be6389d6eb7fcc0e2efb0015b321d541033211fa816ba98fb3f40d0c783f63fc3f15bcca595f35a55ff64e151107771d65cb1a361ad9ad3814c0b011750b7e0e716d1bb9d955853ad4cd1100000fe4be0707439f90157743edf722ef35e37d4bf2828a191c359091f4a1fd7d59ce35cb461257c185';
+const ENDPOINT = 'https://fra.cloud.appwrite.io/v1';
+const PROJECT_ID = '692547d700076f184875';
+const DATABASE_ID = '69402cc30014e050afaf';
+const BUCKET_ID = '6940c7850027b0af7447';
 const CUSTOMIZATIONS_COLLECTION_ID = 'customizations';
 
 const client = new sdk.Client()

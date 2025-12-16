@@ -1,18 +1,17 @@
 // seed.js - Đặt file này ở root project
 const sdk = require('node-appwrite');
 const fetch = require('node-fetch');
-const fs = require('fs');
-const path = require('path');
 const FormData = require('form-data');
+const { Readable } = require('stream');
 
 // ========== CẤU HÌNH APPWRITE ==========
 // Hardcode API Key trực tiếp
-const API_KEY = 'standard_13b9401fd29684bb5adb80d060c6ef703af46eeca76b456181289fdd9ece957a20503d8ef46bfa42bd82aa48433f58181fe12aa42cb8b41066441ea00478cc811cdd4864ceb7c8d7003bdf39a017f5f1842f5963637733fb93b8be984fb4da391f118291ffba6599291c25215468597da58b678716fd41b35e6a240095c95dd1';
+const API_KEY = 'standard_27ffab18f83e031df3a791be6389d6eb7fcc0e2efb0015b321d541033211fa816ba98fb3f40d0c783f63fc3f15bcca595f35a55ff64e151107771d65cb1a361ad9ad3814c0b011750b7e0e716d1bb9d955853ad4cd1100000fe4be0707439f90157743edf722ef35e37d4bf2828a191c359091f4a1fd7d59ce35cb461257c185';
 
 // ⚠️ THAY ĐỔI endpoint theo region của bạn
 // Kiểm tra trong Appwrite Console > Settings > Endpoint
-const ENDPOINT = 'https://nyc.cloud.appwrite.io/v1'; // hoặc region khác của bạn
-const PROJECT_ID = '69230ad2001fb8f2aee4';
+const ENDPOINT = 'https://fra.cloud.appwrite.io/v1'; // hoặc region khác của bạn
+const PROJECT_ID = '692547d700076f184875';
 
 const client = new sdk.Client()
     .setEndpoint(ENDPOINT)
@@ -23,12 +22,12 @@ const databases = new sdk.Databases(client);
 const storage = new sdk.Storage(client);
 
 // Sử dụng đúng config từ appwrite.ts
-const DATABASE_ID = '68629ae60038a7c61fe4';
-const CATEGORIES_COLLECTION_ID = '692315a6001ae62780a0';
+const DATABASE_ID = '69402cc30014e050afaf';
+const CATEGORIES_COLLECTION_ID = 'categories';
 const CUSTOMIZATIONS_COLLECTION_ID = 'customizations';
 const MENU_COLLECTION_ID = 'menu';
 const MENU_CUSTOMIZATIONS_COLLECTION_ID = 'menu_customizations';
-const BUCKET_ID = '692334a700377dae1061';
+const BUCKET_ID = '6940c7850027b0af7447';
 
 
 // ========== DỮ LIỆU ==========
@@ -75,7 +74,7 @@ const dummyData = {
             protein: 25,
             category_name: "Burgers",
             tabs: "1,2", // SUMMER COMBO (1) and BURGER BASH (2)
-            customizations: ["Extra Cheese", "Coca Cola", "French Fries", "Onions", "Bacon"],
+            customizations: ["Extra Cheese", "Coke", "Fries", "Onions", "Bacon"],
         },
         {
             name: "Pepperoni Pizza",
@@ -88,7 +87,7 @@ const dummyData = {
             protein: 30,
             category_name: "Pizzas",
             tabs: "3", // PIZZA PARTY (3)
-            customizations: ["Extra Cheese", "Jalapeño", "Garlic Bread", "Coca Cola", "Olives"],
+            customizations: ["Extra Cheese", "Jalapeños", "Garlic Bread", "Coke", "Olives"],
         },
         {
             name: "Bean Burrito",
@@ -101,7 +100,7 @@ const dummyData = {
             protein: 18,
             category_name: "Burritos",
             tabs: "4", // BURRITO DELIGHT (4)
-            customizations: ["Jalapeño", "Lemon Iced Tea", "French Fries", "Salad"],
+            customizations: ["Jalapeños", "Iced Tea", "Fries", "Salad"],
         },
         {
             name: "BBQ Bacon Burger",
@@ -114,7 +113,7 @@ const dummyData = {
             protein: 29,
             category_name: "Burgers",
             tabs: "1,2", // SUMMER COMBO (1) and BURGER BASH (2)
-            customizations: ["Onions", "French Fries", "Coca Cola", "Bacon", "Avocado"],
+            customizations: ["Onions", "Fries", "Coke", "Bacon", "Avocado"],
         },
         {
             name: "Caesar Chicken Wrap",
@@ -127,7 +126,7 @@ const dummyData = {
             protein: 28,
             category_name: "Wraps",
             tabs: "", // Not in any combo
-            customizations: ["Extra Cheese", "Coca Cola", "Potato Chips", "Tomatoes"],
+            customizations: ["Extra Cheese", "Coke", "Potato Wedges", "Tomatoes"],
         },
         {
             name: "Grilled Veggie Sandwich",
@@ -140,7 +139,7 @@ const dummyData = {
             protein: 19,
             category_name: "Sandwiches",
             tabs: "", // Not in any combo
-            customizations: ["Mushrooms", "Olives", "Cheese Sticks", "Lemon Iced Tea"],
+            customizations: ["Mushrooms", "Olives", "Mozzarella Sticks", "Iced Tea"],
         },
         {
             name: "Double Beef Burger",
@@ -153,7 +152,7 @@ const dummyData = {
             protein: 35,
             category_name: "Burgers",
             tabs: "2", // BURGER BASH (2)
-            customizations: ["Extra Cheese", "Onions", "French Fries", "Coca Cola", "Chicken Bites"],
+            customizations: ["Extra Cheese", "Onions", "Fries", "Coke", "Chicken Nuggets"],
         },
         {
             name: "Paneer Tikka Wrap",
@@ -166,7 +165,7 @@ const dummyData = {
             protein: 20,
             category_name: "Wraps",
             tabs: "", // Not in any combo
-            customizations: ["Jalapeño", "Tomatoes", "Salad", "French Fries", "Lemon Iced Tea"],
+            customizations: ["Jalapeños", "Tomatoes", "Salad", "Fries", "Iced Tea"],
         },
         {
             name: "Mexican Burrito Bowl",
@@ -179,7 +178,7 @@ const dummyData = {
             protein: 24,
             category_name: "Bowls",
             tabs: "", // Not in any combo
-            customizations: ["Avocado", "Sweet Corn", "Salad", "Lemon Iced Tea"],
+            customizations: ["Avocado", "Sweet Corn", "Salad", "Iced Tea"],
         },
         {
             name: "Spicy Chicken Sandwich",
@@ -192,7 +191,7 @@ const dummyData = {
             protein: 26,
             category_name: "Sandwiches",
             tabs: "", // Not in any combo
-            customizations: ["Jalapeño", "Onions", "French Fries", "Coca Cola", "Chocolate Lava Cake"],
+            customizations: ["Jalapeños", "Onions", "Fries", "Coke", "Choco Lava Cake"],
         },
         {
             name: "Classic Margherita Pizza",
@@ -205,7 +204,7 @@ const dummyData = {
             protein: 21,
             category_name: "Pizzas",
             tabs: "3", // PIZZA PARTY (3)
-            customizations: ["Extra Cheese", "Olives", "Coca Cola", "Garlic Bread"],
+            customizations: ["Extra Cheese", "Olives", "Coke", "Garlic Bread"],
         },
         {
             name: "Protein Bowl",
@@ -218,7 +217,7 @@ const dummyData = {
             protein: 38,
             category_name: "Bowls",
             tabs: "", // Not in any combo
-            customizations: ["Avocado", "Salad", "Sweet Corn", "Lemon Iced Tea"],
+            customizations: ["Avocado", "Salad", "Sweet Corn", "Iced Tea"],
         },
         {
             name: "Paneer Burrito",
@@ -231,7 +230,7 @@ const dummyData = {
             protein: 22,
             category_name: "Burritos",
             tabs: "4", // BURRITO DELIGHT (4)
-            customizations: ["Jalapeño", "French Fries", "Garlic Bread", "Coca Cola"],
+            customizations: ["Jalapeños", "Fries", "Garlic Bread", "Coke"],
         },
         {
             name: "Chicken Club Sandwich",
@@ -244,9 +243,8 @@ const dummyData = {
             protein: 31,
             category_name: "Sandwiches",
             tabs: "", // Not in any combo
-            customizations: ["Bacon", "Tomatoes", "Cheese Sticks", "Lemon Iced Tea"],
+            customizations: ["Bacon", "Tomatoes", "Mozzarella Sticks", "Iced Tea"],
         },
-        // Additional items for combos
         {
             name: "Summer Special Burger",
             description: "Fresh beef patty with summer vegetables and special sauce",
@@ -258,7 +256,7 @@ const dummyData = {
             protein: 27,
             category_name: "Burgers",
             tabs: "1", // SUMMER COMBO (1)
-            customizations: ["Extra Cheese", "Tomatoes", "French Fries", "Coca Cola", "Avocado"],
+            customizations: ["Extra Cheese", "Tomatoes", "Fries", "Coke", "Avocado"],
         },
         {
             name: "Crispy Chicken Burger",
@@ -271,7 +269,7 @@ const dummyData = {
             protein: 28,
             category_name: "Burgers",
             tabs: "2", // BURGER BASH (2)
-            customizations: ["Extra Cheese", "Onions", "French Fries", "Coca Cola"],
+            customizations: ["Extra Cheese", "Onions", "Fries", "Coke"],
         },
         {
             name: "Veggie Delight Burger",
@@ -284,7 +282,7 @@ const dummyData = {
             protein: 18,
             category_name: "Burgers",
             tabs: "1", // SUMMER COMBO (1)
-            customizations: ["Mushrooms", "Tomatoes", "Salad", "Lemon Iced Tea"],
+            customizations: ["Mushrooms", "Tomatoes", "Salad", "Iced Tea"],
         },
         {
             name: "BBQ Chicken Pizza",
@@ -297,7 +295,7 @@ const dummyData = {
             protein: 32,
             category_name: "Pizzas",
             tabs: "3", // PIZZA PARTY (3)
-            customizations: ["Extra Cheese", "Jalapeño", "Garlic Bread", "Coca Cola"],
+            customizations: ["Extra Cheese", "Jalapeños", "Garlic Bread", "Coke"],
         },
         {
             name: "Hawaiian Pizza",
@@ -310,7 +308,7 @@ const dummyData = {
             protein: 28,
             category_name: "Pizzas",
             tabs: "3", // PIZZA PARTY (3)
-            customizations: ["Extra Cheese", "Olives", "Garlic Bread", "Coca Cola"],
+            customizations: ["Extra Cheese", "Olives", "Garlic Bread", "Coke"],
         },
         {
             name: "Supreme Pizza",
@@ -323,7 +321,7 @@ const dummyData = {
             protein: 35,
             category_name: "Pizzas",
             tabs: "3", // PIZZA PARTY (3)
-            customizations: ["Extra Cheese", "Jalapeño", "Garlic Bread", "Coca Cola"],
+            customizations: ["Extra Cheese", "Jalapeños", "Garlic Bread", "Coke"],
         },
         {
             name: "Chicken Burrito",
@@ -336,7 +334,7 @@ const dummyData = {
             protein: 30,
             category_name: "Burritos",
             tabs: "4", // BURRITO DELIGHT (4)
-            customizations: ["Extra Cheese", "Jalapeño", "French Fries", "Coca Cola", "Avocado"],
+            customizations: ["Extra Cheese", "Jalapeños", "Fries", "Coke", "Avocado"],
         },
         {
             name: "Beef Burrito",
@@ -349,7 +347,7 @@ const dummyData = {
             protein: 32,
             category_name: "Burritos",
             tabs: "4", // BURRITO DELIGHT (4)
-            customizations: ["Extra Cheese", "Jalapeño", "French Fries", "Coca Cola"],
+            customizations: ["Extra Cheese", "Jalapeños", "Fries", "Coke"],
         },
         {
             name: "Veggie Burrito",
@@ -362,7 +360,7 @@ const dummyData = {
             protein: 20,
             category_name: "Burritos",
             tabs: "4", // BURRITO DELIGHT (4)
-            customizations: ["Extra Cheese", "Avocado", "Salad", "Lemon Iced Tea"],
+            customizations: ["Extra Cheese", "Avocado", "Salad", "Iced Tea"],
         },
     ],
 };
@@ -394,48 +392,36 @@ async function clearStorage() {
     }
 }
 
-// ========== HELPER FUNCTIONS ==========
-async function downloadImage(imageUrl, filename) {
+async function uploadImageToStorage(imageUrl, menuName) {
     try {
+        const filename = `${menuName.replace(/\s+/g, '-').toLowerCase()}.png`;
+        
+        console.log(`    📥 Đang tải ảnh từ URL...`);
         const response = await fetch(imageUrl);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const arrayBuffer = await response.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         
-        const uploadsDir = path.join(__dirname, 'uploads');
-        if (!fs.existsSync(uploadsDir)) {
-            fs.mkdirSync(uploadsDir);
-        }
-        
-        const filePath = path.join(uploadsDir, filename);
-        fs.writeFileSync(filePath, buffer);
-        
-        return filePath;
-    } catch (error) {
-        console.error(`    ❌ Lỗi tải ảnh ${imageUrl}:`, error.message);
-        return null;
-    }
-}
-
-async function uploadImageToStorage(imageUrl, menuName) {
-    try {
-        // Tạo tên file đơn giản
-        const filename = `${menuName.replace(/\s+/g, '-').toLowerCase()}.png`;
-        
-        console.log(`    📥 Đang tải ảnh...`);
-        const localPath = await downloadImage(imageUrl, filename);
-        
-        if (!localPath) {
-            return imageUrl; // Fallback
-        }
-        
         console.log(`    📤 Đang upload lên Storage...`);
+        
+        // Tạo stream từ buffer
+        const stream = Readable.from(buffer);
         
         // Tạo FormData
         const formData = new FormData();
-        formData.append('fileId', sdk.ID.unique());
-        formData.append('file', fs.createReadStream(localPath), filename);
+        const fileId = sdk.ID.unique();
+        formData.append('fileId', fileId);
+        formData.append('file', stream, {
+            filename: filename,
+            contentType: 'image/png',
+            knownLength: buffer.length
+        });
         
-        // Upload bằng fetch thay vì SDK
+        // Upload bằng fetch
         const uploadResponse = await fetch(
             `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files`,
             {
@@ -450,7 +436,8 @@ async function uploadImageToStorage(imageUrl, menuName) {
         );
         
         if (!uploadResponse.ok) {
-            throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+            const errorText = await uploadResponse.text();
+            throw new Error(`Upload failed: ${uploadResponse.statusText} - ${errorText}`);
         }
         
         const fileData = await uploadResponse.json();
@@ -462,7 +449,7 @@ async function uploadImageToStorage(imageUrl, menuName) {
         return fileUrl;
     } catch (error) {
         console.error(`    ❌ Upload failed:`, error.message);
-        return imageUrl; // Fallback
+        return imageUrl; // Fallback về URL gốc nếu upload thất bại
     }
 }
 
@@ -509,7 +496,7 @@ async function seed() {
                 }
             );
             customizationMap[cus.name] = doc.$id;
-            console.log(`  ✓ ${cus.name} ($${cus.price})`);
+            console.log(`  ✓ ${cus.name} (${cus.price}đ)`);
         }
 
         // 4. Seed Menu Items
@@ -531,11 +518,11 @@ async function seed() {
                     calories: item.calories,
                     protein: item.protein,
                     categories: categoryMap[item.category_name],
-                    tabs: item.tabs || "", // Add tabs field (string format: "1,2" for multiple combos)
+                    tabs: item.tabs || "",
                 }
             );
 
-            console.log(`  ✓ ${item.name} ($${item.price})`);
+            console.log(`  ✓ ${item.name} (${item.price}đ)`);
 
             // 5. Tạo menu_customizations relationships
             for (const cusName of item.customizations) {
