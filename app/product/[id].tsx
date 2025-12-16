@@ -1,4 +1,4 @@
-// app/product/[id].tsx - FIXED IMAGE LOADING
+// app/product/[id].tsx - FIXED VERSION
 
 import { View, Text, Image, ScrollView, TouchableOpacity, Alert, Animated, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,13 +7,11 @@ import { useState, useEffect, useRef } from 'react';
 import * as Haptics from 'expo-haptics';
 import { MenuItem, CartCustomization } from '@/type';
 import { useCartStore } from '@/store/cart.store';
-import { databases, appwriteConfig, storage } from '@/lib/appwrite';
+import { databases, appwriteConfig } from '@/lib/appwrite';
 import { Query } from 'react-native-appwrite';
 import CustomButton from '@/components/CustomButton';
 import Toast from '@/components/Toast';
 import cn from 'clsx';
-
-// Import images
 import * as Constants from '@/constants';
 const images = Constants.images;
 
@@ -26,7 +24,6 @@ const ProductDetail = () => {
     const [availableCustomizations, setAvailableCustomizations] = useState<any[]>([]);
     const { addItem } = useCartStore();
 
-    // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
@@ -52,17 +49,17 @@ const ProductDetail = () => {
         }
     }, [loading, product]);
 
-    // ✅ FIXED: Better image URL generation
-    const getImageUrl = (imageId: string | null | undefined): string | null => {
-        if (!imageId) return null;
-        
-        try {
-            // Format: https://[ENDPOINT]/storage/buckets/[BUCKET_ID]/files/[FILE_ID]/view?project=[PROJECT_ID]
-            return `${appwriteConfig.endpoint}/storage/buckets/${appwriteConfig.bucketId}/files/${imageId}/view?project=${appwriteConfig.projectId}`;
-        } catch (error) {
-            console.error('❌ Error generating image URL:', error);
-            return null;
+    // ✅ FIX: Generate proper Appwrite Storage URL with fallback
+    const getImageUrl = (imageId: string | null | undefined, itemName: string): string => {
+        if (!imageId) {
+            return ''; // Return empty to use fallback UI
         }
+        
+        // Remove any whitespace
+        const cleanId = imageId.trim();
+        
+        // Generate Appwrite Storage view URL
+        return `${appwriteConfig.endpoint}/storage/buckets/${appwriteConfig.bucketId}/files/${cleanId}/view?project=${appwriteConfig.projectId}`;
     };
 
     const fetchProductDetail = async () => {
@@ -84,7 +81,6 @@ const ProductDetail = () => {
                 [Query.equal('menu', id)]
             );
 
-            // Extract customization IDs
             const customizationIds: string[] = [];
             
             for (const doc of menuCustomizations.documents) {
@@ -98,7 +94,6 @@ const ProductDetail = () => {
             }
 
             if (customizationIds.length > 0) {
-                // Validate IDs
                 const validIds = customizationIds.filter(id => {
                     return id && 
                           typeof id === 'string' && 
@@ -108,7 +103,6 @@ const ProductDetail = () => {
                 });
 
                 if (validIds.length > 0) {
-                    // Fetch customizations
                     const customizationPromises = validIds.map((cusId: string) =>
                         databases.getDocument(
                             appwriteConfig.databaseId,
@@ -123,16 +117,11 @@ const ProductDetail = () => {
                     const customizationDocs = await Promise.all(customizationPromises);
                     const validCustomizations = customizationDocs.filter(doc => doc !== null);
                     
-                    // ✅ FIXED: Generate proper image URLs
+                    // ✅ FIX: Generate proper URLs with error handling
                     const customizationsWithImages = validCustomizations.map((doc: any) => {
-                        let imageUrl = null;
+                        const imageUrl = doc.image_id ? getImageUrl(doc.image_id, doc.name) : '';
                         
-                        if (doc.image_id) {
-                            imageUrl = getImageUrl(doc.image_id);
-                            
-                            // Debug log
-                            console.log(`🖼️  ${doc.name}: ${imageUrl ? '✅ Has image' : '❌ No image'}`);
-                        }
+                        console.log(`🖼️  ${doc.name}: ${imageUrl || 'No image - will use emoji fallback'}`);
                         
                         return {
                             ...doc,
@@ -376,7 +365,7 @@ const ProductDetail = () => {
                             </View>
                         </View>
 
-                        {/* ✅ Toppings WITH REAL IMAGES */}
+                        {/* ✅ Toppings WITH PROPER IMAGE HANDLING */}
                         {toppings.length > 0 && (
                             <View className="mb-6">
                                 <Text className="base-bold text-dark-100 mb-3">
@@ -402,13 +391,10 @@ const ProductDetail = () => {
                                                     alignItems: 'center',
                                                 }}
                                             >
-                                                {/* ✅ FIXED: Hiển thị ảnh thật với cache busting */}
+                                                {/* ✅ FIX: Only show image if URL exists and valid */}
                                                 {topping.imageUrl ? (
                                                     <Image
-                                                        source={{ 
-                                                            uri: `${topping.imageUrl}&t=${Date.now()}`,
-                                                            cache: 'reload'
-                                                        }}
+                                                        source={{ uri: topping.imageUrl }}
                                                         style={{ 
                                                             width: 48, 
                                                             height: 48, 
@@ -417,7 +403,7 @@ const ProductDetail = () => {
                                                         }}
                                                         resizeMode="cover"
                                                         onError={(e) => {
-                                                            console.error(`❌ Image load failed for ${topping.name}:`, e.nativeEvent.error);
+                                                            console.error(`❌ Failed to load: ${topping.name}`);
                                                         }}
                                                     />
                                                 ) : (
@@ -432,7 +418,7 @@ const ProductDetail = () => {
                                                             alignItems: 'center',
                                                         }}
                                                     >
-                                                        <Text style={{ fontSize: 24 }}>🍕</Text>
+                                                        <Text style={{ fontSize: 24 }}>🧀</Text>
                                                     </View>
                                                 )}
                                                 
@@ -456,7 +442,7 @@ const ProductDetail = () => {
                             </View>
                         )}
 
-                        {/* ✅ Sides WITH REAL IMAGES */}
+                        {/* ✅ Sides WITH PROPER IMAGE HANDLING */}
                         {sides.length > 0 && (
                             <View className="mb-6">
                                 <Text className="base-bold text-dark-100 mb-3">
@@ -482,13 +468,10 @@ const ProductDetail = () => {
                                                     alignItems: 'center',
                                                 }}
                                             >
-                                                {/* ✅ FIXED: Hiển thị ảnh thật với cache busting */}
+                                                {/* ✅ FIX: Proper error handling + fallback */}
                                                 {side.imageUrl ? (
                                                     <Image
-                                                        source={{ 
-                                                            uri: `${side.imageUrl}&t=${Date.now()}`,
-                                                            cache: 'reload'
-                                                        }}
+                                                        source={{ uri: side.imageUrl }}
                                                         style={{ 
                                                             width: 48, 
                                                             height: 48, 
@@ -497,8 +480,9 @@ const ProductDetail = () => {
                                                         }}
                                                         resizeMode="cover"
                                                         onError={(e) => {
-                                                            console.error(`❌ Image load failed for ${side.name}:`, e.nativeEvent.error);
+                                                            console.error(`❌ Failed to load: ${side.name}`, e.nativeEvent);
                                                         }}
+                                                        defaultSource={require('@/assets/images/fries.png')}
                                                     />
                                                 ) : (
                                                     <View
@@ -568,9 +552,8 @@ const ProductDetail = () => {
                 </ScrollView>
             </Animated.View>
 
-            {/* Bottom Section - Fixed */}
+            {/* Bottom Section */}
             <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-5 py-4 shadow-lg">
-                {/* Quantity Selector */}
                 <View className="flex-row items-center justify-between mb-4">
                     <Text className="base-semibold text-dark-100">Quantity</Text>
                     <View className="flex-row items-center gap-4">
@@ -605,14 +588,12 @@ const ProductDetail = () => {
                     </View>
                 </View>
 
-                {/* Add to Cart Button */}
                 <CustomButton
                     title={`Add to Cart - ${calculateTotalPrice().toLocaleString('vi-VN')}đ`}
                     onPress={handleAddToCart}
                 />
             </View>
 
-            {/* Toast Notification */}
             <Toast
                 visible={showToast}
                 message={toastMessage}

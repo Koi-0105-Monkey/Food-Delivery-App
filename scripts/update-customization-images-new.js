@@ -1,14 +1,13 @@
-// scripts/update-customization-images.js
-// FINAL VERSION - Simple & Working
+// scripts/update-customization-images-new.js
+// Update image_id cho customizations trong môi trường mới
 
 const sdk = require('node-appwrite');
 
-// ========== CONFIG ==========
-const API_KEY = 'standard_13b9401fd29684bb5adb80d060c6ef703af46eeca76b456181289fdd9ece957a20503d8ef46bfa42bd82aa48433f58181fe12aa42cb8b41066441ea00478cc811cdd4864ceb7c8d7003bdf39a017f5f1842f5963637733fb93b8be984fb4da391f118291ffba6599291c25215468597da58b678716fd41b35e6a240095c95dd1';
-const ENDPOINT = 'https://nyc.cloud.appwrite.io/v1';
-const PROJECT_ID = '69230ad2001fb8f2aee4';
-const DATABASE_ID = '68629ae60038a7c61fe4';
-const BUCKET_ID = '692334a700377dae1061';
+// ========== NEW CONFIG ==========
+const API_KEY = 'standard_27ffab18f83e031df3a791be6389d6eb7fcc0e2efb0015b321d541033211fa816ba98fb3f40d0c783f63fc3f15bcca595f35a55ff64e151107771d65cb1a361ad9ad3814c0b011750b7e0e716d1bb9d955853ad4cd1100000fe4be0707439f90157743edf722ef35e37d4bf2828a191c359091f4a1fd7d59ce35cb461257c185';
+const ENDPOINT = 'https://fra.cloud.appwrite.io/v1';
+const PROJECT_ID = '692547d700076f184875';
+const DATABASE_ID = '69402cc30014e050afaf';
 const CUSTOMIZATIONS_COLLECTION_ID = 'customizations';
 
 const client = new sdk.Client()
@@ -17,21 +16,21 @@ const client = new sdk.Client()
     .setKey(API_KEY);
 
 const databases = new sdk.Databases(client);
-const storage = new sdk.Storage(client);
 
-// ========== HARDCODED FILE IDs (từ ảnh Storage của bạn) ==========
+// ========== FILE IDs (PASTE FROM UPLOAD SCRIPT OUTPUT) ==========
+// TODO: Thay thế bằng FILE IDs thực tế sau khi upload
 const FILE_ID_MAP = {
-    'cheese.png': '693590860032a0a41786',
-    'onions.png': '69359088000200943793',
-    'mushrooms.png': '693590890004b421a7b0',
-    'tomatoes.png': '6935908a0006be2d1c9c',
-    'bacon.png': '6935908b000cf0874e8d',
-    'avocado.png': '6935908c0010ffaee093',
-    'fries.png': '6935908d00123323dd44',
-    'salad.png': '6935908e001423e247b7',
-    'mozarella-sticks.png': '6935908f00167a671a58',
-    'cucumber.png': '69359090001c0ad511ce',
-    'coleslaw.png': '69359091001d8514b500',
+    'cheese.png': '69411f39001320c20c82',
+    'onions.png': '69411f3a0026104640db',
+    'mushrooms.png': '69411f3b0023f0046f73',
+    'tomatoes.png': '69411f3c00223e0618a1',
+    'bacon.png': '69411f3d001e528cbec9',
+    'avocado.png': '69411f3e001ade27a987',
+    'fries.png': '69411f3f00184e1e901f',
+    'salad.png': '69411f400015ab1b9edb',
+    'mozarella-sticks.png': '69411f4100130d677879',
+    'cucumber.png': '69411f42000e44a8232e',
+    'coleslaw.png': '69411f43000b397aac97',
 };
 
 // ========== MAPPING ==========
@@ -39,6 +38,7 @@ const CUSTOMIZATION_IMAGE_MAPPING = {
     // Toppings
     'Extra Cheese': 'cheese.png',
     'Jalapeños': 'onions.png',
+    'Jalapeño': 'onions.png',
     'Onions': 'onions.png',
     'Olives': 'mushrooms.png',
     'Mushrooms': 'mushrooms.png',
@@ -48,29 +48,47 @@ const CUSTOMIZATION_IMAGE_MAPPING = {
     
     // Sides
     'Coke': 'fries.png',
+    'Coca Cola': 'fries.png',
     'Fries': 'fries.png',
+    'French Fries': 'fries.png',
     'Garlic Bread': 'fries.png',
     'Chicken Nuggets': 'fries.png',
+    'Chicken Bites': 'fries.png',
     'Iced Tea': 'fries.png',
+    'Lemon Iced Tea': 'fries.png',
     'Salad': 'salad.png',
     'Potato Wedges': 'fries.png',
+    'Potato Chips': 'fries.png',
     'Mozzarella Sticks': 'mozarella-sticks.png',
+    'Cheese Sticks': 'mozarella-sticks.png',
     'Sweet Corn': 'cucumber.png',
     'Choco Lava Cake': 'fries.png',
+    'Chocolate Lava Cake': 'fries.png',
+    'Coleslaw': 'coleslaw.png',
 };
 
 // ========== MAIN FUNCTION ==========
 async function updateCustomizationImages() {
     try {
         console.log('🚀 Starting customization images update...\n');
+        console.log('📍 Project:', PROJECT_ID);
+        console.log('💾 Database:', DATABASE_ID);
+        console.log('');
 
         // Get all customizations
-        console.log('📦 Fetching customizations from Database...');
+        console.log('📦 Fetching customizations...');
         const customizations = await databases.listDocuments(
             DATABASE_ID,
             CUSTOMIZATIONS_COLLECTION_ID
         );
         console.log(`✅ Found ${customizations.documents.length} customizations\n`);
+
+        // List all customization names
+        console.log('📋 Customizations in database:');
+        customizations.documents.forEach((doc, idx) => {
+            console.log(`  ${idx + 1}. "${doc.name}" (${doc.type})`);
+        });
+        console.log('');
 
         // Update each customization
         let updatedCount = 0;
@@ -84,7 +102,7 @@ async function updateCustomizationImages() {
             console.log(`🍕 Processing: "${cusName}"`);
 
             // Check if already has image
-            if (customization.image_id) {
+            if (customization.image_id && customization.image_id !== 'YOUR_FILE_ID_HERE') {
                 console.log(`  ℹ️  Already has image_id: ${customization.image_id}`);
                 skippedCount++;
                 continue;
@@ -93,15 +111,18 @@ async function updateCustomizationImages() {
             // Check if mapping exists
             if (!expectedFilename) {
                 console.warn(`  ⚠️  No mapping found`);
+                console.warn(`  💡 Add this line to CUSTOMIZATION_IMAGE_MAPPING:`);
+                console.warn(`     '${cusName}': 'YOUR_FILE.png',`);
                 notFoundCount++;
                 continue;
             }
 
-            // Get file ID from hardcoded map
+            // Get file ID
             const fileId = FILE_ID_MAP[expectedFilename];
 
-            if (!fileId) {
-                console.warn(`  ⚠️  File ID not found for: ${expectedFilename}`);
+            if (!fileId || fileId === 'YOUR_FILE_ID_HERE') {
+                console.warn(`  ⚠️  File ID not set for: ${expectedFilename}`);
+                console.warn(`  💡 Run upload script first!`);
                 notFoundCount++;
                 continue;
             }
@@ -119,8 +140,8 @@ async function updateCustomizationImages() {
                 console.log(`  ✅ Updated with image_id: ${fileId}\n`);
                 updatedCount++;
 
-                // Sleep to avoid rate limit
-                await new Promise(resolve => setTimeout(resolve, 200));
+                // Delay to avoid rate limit
+                await new Promise(resolve => setTimeout(resolve, 300));
             } catch (error) {
                 console.error(`  ❌ Update failed:`, error.message);
             }
@@ -136,10 +157,15 @@ async function updateCustomizationImages() {
         console.log('='.repeat(60));
 
         if (updatedCount > 0) {
-            console.log('\n🎉 Success! Images linked to customizations.');
+            console.log('\n🎉 Success! Customization images updated.');
             console.log('\n📝 Next steps:');
             console.log('   1. Restart app: npx expo start -c');
-            console.log('   2. Check product detail page for images!');
+            console.log('   2. Open product detail page');
+            console.log('   3. Images should now appear! 🖼️');
+        } else if (notFoundCount > 0) {
+            console.log('\n⚠️  No updates made.');
+            console.log('   Please run upload script first:');
+            console.log('   node scripts/upload-customization-images-new.js');
         }
 
     } catch (error) {
