@@ -1,3 +1,4 @@
+// store/cart.store.ts - OPTIMIZED VERSION
 import { CartCustomization, CartStore } from "@/type";
 import { create } from "zustand";
 import { 
@@ -12,23 +13,28 @@ function areCustomizationsEqual(
     b: CartCustomization[] = []
 ): boolean {
     if (a.length !== b.length) return false;
-
     const aSorted = [...a].sort((x, y) => x.id.localeCompare(y.id));
     const bSorted = [...b].sort((x, y) => x.id.localeCompare(y.id));
-
     return aSorted.every((item, idx) => item.id === bSorted[idx].id);
 }
 
-// Helper to sync cart to server
-async function syncToServer(items: any[]) {
-    try {
-        const user = await getCurrentUser();
-        if (user) {
-            await syncCartToServer(user.$id, items);
-        }
-    } catch (error) {
-        console.error('Failed to sync cart:', error);
+// ✅ FIX 1: Debounce sync để tránh gọi quá nhiều
+let syncTimeout: ReturnType<typeof setTimeout> | null = null;
+async function debouncedSyncToServer(items: any[]) {
+    if (syncTimeout) {
+        clearTimeout(syncTimeout);
     }
+    
+    syncTimeout = setTimeout(async () => {
+        try {
+            const user = await getCurrentUser();
+            if (user) {
+                await syncCartToServer(user.$id, items);
+            }
+        } catch (error) {
+            console.error('Failed to sync cart:', error);
+        }
+    }, 1000); // ✅ Chờ 1s sau lần thay đổi cuối
 }
 
 export const useCartStore = create<CartStore>((set, get) => ({
@@ -36,7 +42,6 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
     addItem: (item) => {
         const customizations = item.customizations ?? [];
-
         const existing = get().items.find(
             (i) =>
                 i.id === item.id &&
@@ -56,9 +61,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
         }
 
         set({ items: newItems });
-        
-        // Sync to server
-        syncToServer(newItems);
+        debouncedSyncToServer(newItems); // ✅ Dùng debounced
     },
 
     removeItem: (id, customizations = []) => {
@@ -69,11 +72,8 @@ export const useCartStore = create<CartStore>((set, get) => ({
                     areCustomizationsEqual(i.customizations ?? [], customizations)
                 )
         );
-        
         set({ items: newItems });
-        
-        // Sync to server
-        syncToServer(newItems);
+        debouncedSyncToServer(newItems);
     },
 
     increaseQty: (id, customizations = []) => {
@@ -83,11 +83,8 @@ export const useCartStore = create<CartStore>((set, get) => ({
                 ? { ...i, quantity: i.quantity + 1 }
                 : i
         );
-        
         set({ items: newItems });
-        
-        // Sync to server
-        syncToServer(newItems);
+        debouncedSyncToServer(newItems);
     },
 
     decreaseQty: (id, customizations = []) => {
@@ -99,17 +96,19 @@ export const useCartStore = create<CartStore>((set, get) => ({
                     : i
             )
             .filter((i) => i.quantity > 0);
-        
         set({ items: newItems });
-        
-        // Sync to server
-        syncToServer(newItems);
+        debouncedSyncToServer(newItems);
     },
 
     clearCart: async () => {
         set({ items: [] });
         
-        // Clear from server
+        // ✅ Clear timeout trước khi clear cart
+        if (syncTimeout) {
+            clearTimeout(syncTimeout);
+            syncTimeout = null;
+        }
+        
         try {
             const user = await getCurrentUser();
             if (user) {
