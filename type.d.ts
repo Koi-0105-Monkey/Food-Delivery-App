@@ -48,7 +48,7 @@ export interface CartCustomization {
 }
 
 export interface CartItemType {
-    id: string; // menu item id
+    id: string;
     name: string;
     price: number;
     image_url: string;
@@ -63,7 +63,7 @@ export interface CartStore {
     increaseQty: (id: string, customizations: CartCustomization[]) => void;
     decreaseQty: (id: string, customizations: CartCustomization[]) => void;
     clearCart: () => Promise<void>;
-    loadCartFromServer: () => Promise<void>; // 👈 Thêm method mới
+    loadCartFromServer: () => Promise<void>;
     getTotalItems: () => number;
     getTotalPrice: () => number;
 }
@@ -124,22 +124,14 @@ interface SignInParams {
 interface GetMenuParams {
     category: string;
     query: string;
-    tabs?: string; // Combo tab ID (1, 2, 3, or 4)
+    tabs?: string;
 }
 
-// type.d.ts - Thêm vào file type.d.ts hiện có
+// ========== PAYMENT & ORDER TYPES ==========
 
 export type PaymentMethod = 'cod' | 'bidv' | 'card';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'cancelled';
 export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'delivering' | 'completed' | 'cancelled';
-
-export interface PaymentInfo {
-    method: PaymentMethod;
-    status: PaymentStatus;
-    transactionId?: string;
-    qrCodeUrl?: string;
-    paidAt?: string;
-}
 
 export interface OrderItem {
     menu_id: string;
@@ -150,8 +142,21 @@ export interface OrderItem {
     customizations?: CartCustomization[];
 }
 
+// ✅ CREATE ORDER PARAMS
+export interface CreateOrderParams {
+    items: OrderItem[];
+    subtotal: number;
+    delivery_fee: number;
+    discount: number;
+    total: number;
+    delivery_address: string;
+    delivery_phone: string;
+    delivery_notes?: string;
+    payment_method: PaymentMethod;
+}
+
 export interface Order extends Models.Document {
-    user: string; // Relationship attribute (userId)
+    user: string;
     order_number: string;
     items: string; // JSON string of OrderItem[]
     
@@ -175,16 +180,12 @@ export interface Order extends Models.Document {
     
     // Order Status
     order_status: OrderStatus;
-    
-    // ✅ Timestamps - Dùng $createdAt và $updatedAt có sẵn của Appwrite
-    // $createdAt: string;
-    // $updatedAt: string;
 }
 
 export interface CardPaymentData {
     cardNumber: string;
     cardHolder: string;
-    expiryDate: string;  // ✅ Dùng format MM/YY (đơn giản hơn)
+    expiryDate: string;
     cvv: string;
 }
 

@@ -1,4 +1,4 @@
-// lib/payment.ts - BIDV PAYMENT VIA SEPAY
+// lib/payment.ts - FIXED WITH RETRY LOGIC
 
 import { ID, Query } from 'react-native-appwrite';
 import { appwriteConfig, databases } from './appwrite';
@@ -6,6 +6,38 @@ import { CreateOrderParams, Order } from '@/type';
 import { generateSepayBIDVQR } from './sepay-bidv';
 
 const ORDERS_COLLECTION_ID = process.env.EXPO_PUBLIC_APPWRITE_ORDERS_COLLECTION_ID!;
+
+/**
+ * ✅ Retry helper function
+ */
+async function retryAsync<T>(
+    fn: () => Promise<T>,
+    maxRetries = 3,
+    delay = 1000
+): Promise<T> {
+    let lastError: any;
+    
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await fn();
+        } catch (error: any) {
+            lastError = error;
+            
+            // Don't retry on client errors (4xx)
+            if (error.code >= 400 && error.code < 500) {
+                throw error;
+            }
+            
+            // Wait before retry
+            if (i < maxRetries - 1) {
+                console.log(`⚠️ Retry ${i + 1}/${maxRetries} after ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+    
+    throw lastError;
+}
 
 /**
  * Generate unique order number
@@ -61,7 +93,7 @@ export async function createQRPayment(
 }
 
 /**
- * ✅ Polling payment status - Check every 3s
+ * ✅ Polling payment status - Check every 3s WITH RETRY
  */
 export async function pollPaymentStatus(
     orderId: string, 
@@ -75,7 +107,8 @@ export async function pollPaymentStatus(
             attempts++;
 
             try {
-                const order = await getOrderById(orderId);
+                // ✅ Use retry logic for getOrderById
+                const order = await retryAsync(() => getOrderById(orderId), 2, 500);
                 
                 if (order) {
                     if (order.payment_status === 'paid') {
@@ -95,6 +128,8 @@ export async function pollPaymentStatus(
                     resolve(false);
                 }
             } catch (error) {
+                console.error(`⚠️ Polling attempt ${attempts} failed:`, error);
+                
                 if (attempts >= maxAttempts) {
                     clearInterval(interval);
                     resolve(false);
@@ -105,10 +140,10 @@ export async function pollPaymentStatus(
 }
 
 /**
- * Create order
+ * ✅ Create order WITH RETRY
  */
 export async function createOrder(userId: string, params: CreateOrderParams): Promise<Order> {
-    try {
+    return retryAsync(async () => {
         const orderNumber = generateOrderNumber();
         
         const orderDoc = await databases.createDocument(
@@ -135,14 +170,14 @@ export async function createOrder(userId: string, params: CreateOrderParams): Pr
         
         console.log('✅ Order created:', orderNumber);
         return orderDoc as Order;
-    } catch (error: any) {
-        console.error('❌ Order creation error:', error);
-        throw new Error(error.message || 'Unable to create order');
-    }
+    }, 3, 1000);
 }
 
+/**
+ * ✅ Get user orders WITH RETRY
+ */
 export async function getUserOrders(userId: string): Promise<Order[]> {
-    try {
+    return retryAsync(async () => {
         const orders = await databases.listDocuments(
             appwriteConfig.databaseId,
             ORDERS_COLLECTION_ID,
@@ -154,34 +189,39 @@ export async function getUserOrders(userId: string): Promise<Order[]> {
         );
         
         return orders.documents as Order[];
-    } catch (error: any) {
-        console.error('❌ Get orders error:', error);
-        return [];
-    }
+    }, 3, 1000);
 }
 
+/**
+ * ✅ Get order by ID WITH RETRY
+ */
 export async function getOrderById(orderId: string): Promise<Order | null> {
     try {
-        const order = await databases.getDocument(
-            appwriteConfig.databaseId,
-            ORDERS_COLLECTION_ID,
-            orderId
-        );
-        
-        return order as Order;
+        return await retryAsync(async () => {
+            const order = await databases.getDocument(
+                appwriteConfig.databaseId,
+                ORDERS_COLLECTION_ID,
+                orderId
+            );
+            
+            return order as Order;
+        }, 2, 500); // Fewer retries for polling
     } catch (error: any) {
-        console.error('❌ Get order error:', error);
+        console.error('❌ Get order error:', error.message);
         return null;
     }
 }
 
+/**
+ * ✅ Update payment status WITH RETRY
+ */
 export async function updatePaymentStatus(
     orderId: string,
     status: 'paid' | 'failed',
     transactionId?: string,
     receivedAmount?: number
 ): Promise<void> {
-    try {
+    return retryAsync(async () => {
         await databases.updateDocument(
             appwriteConfig.databaseId,
             ORDERS_COLLECTION_ID,
@@ -196,17 +236,14 @@ export async function updatePaymentStatus(
         );
         
         console.log(`✅ Status updated: ${status}`);
-    } catch (error: any) {
-        console.error('❌ Update payment error:', error);
-        throw new Error(error.message || 'Unable to update payment status');
-    }
+    }, 3, 1000);
 }
 
 /**
- * Cancel order
+ * ✅ Cancel order WITH RETRY
  */
 export async function cancelOrder(orderId: string): Promise<void> {
-    try {
+    return retryAsync(async () => {
         await databases.updateDocument(
             appwriteConfig.databaseId,
             ORDERS_COLLECTION_ID,
@@ -218,8 +255,5 @@ export async function cancelOrder(orderId: string): Promise<void> {
         );
         
         console.log(`✅ Order cancelled: ${orderId}`);
-    } catch (error: any) {
-        console.error('❌ Cancel order error:', error);
-        throw new Error(error.message || 'Unable to cancel order');
-    }
+    }, 3, 1000);
 }

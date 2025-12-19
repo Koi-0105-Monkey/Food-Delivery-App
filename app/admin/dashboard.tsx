@@ -1,4 +1,4 @@
-// app/admin/dashboard.tsx - REAL DATA + BEAUTIFUL DESIGN
+// app/admin/dashboard.tsx - PROFESSIONAL REDESIGN
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, Dimensions, RefreshControl, Animated } from 'react-native';
@@ -11,13 +11,19 @@ const { width } = Dimensions.get('window');
 
 const Dashboard = () => {
     const [stats, setStats] = useState({
+        // Today's key metrics
         todayRevenue: 0,
-        yesterdayRevenue: 0,
+        todayOrders: 0,
         todayGrowth: 0,
-        totalOrders: 0,
+        
+        // Quick stats
         pendingOrders: 0,
         completedOrders: 0,
         totalCustomers: 0,
+        
+        // Comparison data
+        yesterdayRevenue: 0,
+        lastWeekRevenue: 0,
     });
     const [loading, setLoading] = useState(true);
     const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -76,14 +82,17 @@ const Dashboard = () => {
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             const yesterday = new Date(today);
             yesterday.setDate(yesterday.getDate() - 1);
+            
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
 
-            // ✅ REAL DATA: Today's paid orders
+            // Today's paid orders
             const todayPaidOrders = allOrders.documents.filter((order: any) => 
                 order.payment_status === 'paid' && 
                 new Date(order.$createdAt) >= today
             );
 
-            // ✅ REAL DATA: Yesterday's paid orders
+            // Yesterday's paid orders
             const yesterdayPaidOrders = allOrders.documents.filter((order: any) => {
                 const date = new Date(order.$createdAt);
                 return order.payment_status === 'paid' && 
@@ -91,10 +100,16 @@ const Dashboard = () => {
                        date < today;
             });
 
+            // Last week's paid orders
+            const lastWeekPaidOrders = allOrders.documents.filter((order: any) => 
+                order.payment_status === 'paid' && 
+                new Date(order.$createdAt) >= weekAgo
+            );
+
             const todayRevenue = todayPaidOrders.reduce((sum: number, order: any) => sum + order.total, 0);
             const yesterdayRevenue = yesterdayPaidOrders.reduce((sum: number, order: any) => sum + order.total, 0);
+            const lastWeekRevenue = lastWeekPaidOrders.reduce((sum: number, order: any) => sum + order.total, 0);
 
-            // ✅ REAL GROWTH: Calculate based on real data
             const todayGrowth = yesterdayRevenue > 0 
                 ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100 
                 : (todayRevenue > 0 ? 100 : 0);
@@ -115,12 +130,13 @@ const Dashboard = () => {
 
             setStats({
                 todayRevenue,
-                yesterdayRevenue,
+                todayOrders: todayPaidOrders.length,
                 todayGrowth,
-                totalOrders: allOrders.total,
                 pendingOrders,
                 completedOrders,
                 totalCustomers: customers.total,
+                yesterdayRevenue,
+                lastWeekRevenue,
             });
 
         } catch (error) {
@@ -130,56 +146,9 @@ const Dashboard = () => {
         }
     };
 
-    const StatCard = ({ 
-        title, 
-        value, 
-        icon, 
-        color, 
-        onPress 
-    }: { 
-        title: string; 
-        value: string; 
-        icon: any; 
-        color: string; 
-        onPress?: () => void;
-    }) => (
-        <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={onPress}
-            style={{
-                width: (width - 60) / 2,
-                backgroundColor: 'white',
-                borderRadius: 24,
-                padding: 20,
-                marginBottom: 16,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.08,
-                shadowRadius: 12,
-                elevation: 3,
-                borderWidth: 1,
-                borderColor: '#F0F0F0',
-            }}
-        >
-            <View
-                style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 14,
-                    backgroundColor: color + '15',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: 12,
-                }}
-            >
-                <Image source={icon} style={{ width: 22, height: 22 }} tintColor={color} />
-            </View>
-            <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#1A1A1A', marginBottom: 4 }}>
-                {value}
-            </Text>
-            <Text style={{ fontSize: 13, color: '#8B8B8B', fontWeight: '500' }}>{title}</Text>
-        </TouchableOpacity>
-    );
+    const formatCurrency = (amount: number) => {
+        return amount.toLocaleString('vi-VN') + 'đ';
+    };
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
@@ -191,120 +160,245 @@ const Dashboard = () => {
                     }
                 >
                     {/* Header */}
-                    <View style={{ marginBottom: 24 }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#8B8B8B', letterSpacing: 0.5 }}>
+                    <View style={{ marginBottom: 32 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#8B8B8B', letterSpacing: 0.5, marginBottom: 8 }}>
                             ADMIN DASHBOARD
                         </Text>
-                        <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#1A1A1A', marginTop: 6 }}>
+                        <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#1A1A1A' }}>
                             Today's Overview
+                        </Text>
+                        <Text style={{ fontSize: 14, color: '#8B8B8B', marginTop: 4 }}>
+                            {new Date().toLocaleDateString('en-US', { 
+                                weekday: 'long', 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric' 
+                            })}
                         </Text>
                     </View>
 
-                    {/* 🔥 BIG CARD: Today's Revenue */}
+                    {/* 💰 TODAY'S REVENUE - Hero Card */}
                     <View
                         style={{
-                            backgroundColor: 'white',
+                            backgroundColor: '#FE8C00',
                             borderRadius: 28,
                             padding: 28,
-                            marginBottom: 20,
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 6 },
-                            shadowOpacity: 0.12,
+                            marginBottom: 24,
+                            shadowColor: '#FE8C00',
+                            shadowOffset: { width: 0, height: 8 },
+                            shadowOpacity: 0.3,
                             shadowRadius: 16,
-                            elevation: 8,
-                            borderWidth: 2,
-                            borderColor: '#FE8C00',
+                            elevation: 10,
                         }}
                     >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)', fontWeight: '600', marginBottom: 12 }}>
+                                    Today's Revenue
+                                </Text>
+                                <Text style={{ fontSize: 42, fontWeight: 'bold', color: 'white', letterSpacing: -1 }}>
+                                    {formatCurrency(stats.todayRevenue)}
+                                </Text>
+                            </View>
+                            
                             <View
                                 style={{
-                                    width: 56,
-                                    height: 56,
+                                    backgroundColor: stats.todayGrowth >= 0 ? 'rgba(255,255,255,0.25)' : 'rgba(241,65,65,0.25)',
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 10,
                                     borderRadius: 16,
-                                    backgroundColor: '#FFF5E6',
+                                }}
+                            >
+                                <Text style={{ fontSize: 16, fontWeight: '700', color: 'white' }}>
+                                    {stats.todayGrowth >= 0 ? '↑' : '↓'} {Math.abs(stats.todayGrowth).toFixed(1)}%
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Today's Orders */}
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: 'rgba(255,255,255,0.15)',
+                                paddingHorizontal: 20,
+                                paddingVertical: 16,
+                                borderRadius: 16,
+                            }}
+                        >
+                            <View
+                                style={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: 24,
+                                    backgroundColor: 'rgba(255,255,255,0.2)',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     marginRight: 16,
                                 }}
                             >
-                                <Text style={{ fontSize: 32 }}>💰</Text>
+                                <Text style={{ fontSize: 24 }}>📦</Text>
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 14, color: '#8B8B8B', fontWeight: '600', marginBottom: 4 }}>
-                                    Today's Revenue
+                                <Text style={{ fontSize: 28, fontWeight: 'bold', color: 'white' }}>
+                                    {stats.todayOrders}
                                 </Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                                    <Text style={{ fontSize: 36, fontWeight: 'bold', color: '#FE8C00' }}>
-                                        {(stats.todayRevenue / 1000).toFixed(0)}
+                                <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)' }}>
+                                    Orders Today
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Comparison */}
+                        <View style={{ marginTop: 20, paddingTop: 20, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.2)' }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <View>
+                                    <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>
+                                        Yesterday
                                     </Text>
-                                    <Text style={{ fontSize: 20, color: '#8B8B8B', marginLeft: 4 }}>
-                                        K đ
+                                    <Text style={{ fontSize: 18, fontWeight: '700', color: 'white' }}>
+                                        {formatCurrency(stats.yesterdayRevenue)}
+                                    </Text>
+                                </View>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                    <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>
+                                        Last 7 Days
+                                    </Text>
+                                    <Text style={{ fontSize: 18, fontWeight: '700', color: 'white' }}>
+                                        {formatCurrency(stats.lastWeekRevenue)}
                                     </Text>
                                 </View>
                             </View>
                         </View>
+                    </View>
 
-                        {/* Growth Indicator */}
+                    {/* 📊 Quick Stats Grid */}
+                    <View style={{ marginBottom: 24 }}>
+                        <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1A1A1A', marginBottom: 16 }}>
+                            Quick Stats
+                        </Text>
+                        
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                            {/* Pending Orders */}
+                            <View
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: 'white',
+                                    borderRadius: 20,
+                                    padding: 20,
+                                    borderWidth: 2,
+                                    borderColor: stats.pendingOrders > 0 ? '#F59E0B' : '#F3F4F6',
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.05,
+                                    shadowRadius: 8,
+                                    elevation: 2,
+                                }}
+                            >
+                                <View
+                                    style={{
+                                        width: 44,
+                                        height: 44,
+                                        borderRadius: 22,
+                                        backgroundColor: '#FFF5E6',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        marginBottom: 12,
+                                    }}
+                                >
+                                    <Text style={{ fontSize: 24 }}>⏳</Text>
+                                </View>
+                                <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#1A1A1A', marginBottom: 4 }}>
+                                    {stats.pendingOrders}
+                                </Text>
+                                <Text style={{ fontSize: 13, color: '#8B8B8B', fontWeight: '600' }}>
+                                    Pending Orders
+                                </Text>
+                            </View>
+
+                            {/* Completed Orders */}
+                            <View
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: 'white',
+                                    borderRadius: 20,
+                                    padding: 20,
+                                    borderWidth: 2,
+                                    borderColor: '#F3F4F6',
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.05,
+                                    shadowRadius: 8,
+                                    elevation: 2,
+                                }}
+                            >
+                                <View
+                                    style={{
+                                        width: 44,
+                                        height: 44,
+                                        borderRadius: 22,
+                                        backgroundColor: '#E8F5E9',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        marginBottom: 12,
+                                    }}
+                                >
+                                    <Text style={{ fontSize: 24 }}>✅</Text>
+                                </View>
+                                <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#1A1A1A', marginBottom: 4 }}>
+                                    {stats.completedOrders}
+                                </Text>
+                                <Text style={{ fontSize: 13, color: '#8B8B8B', fontWeight: '600' }}>
+                                    Completed
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Total Customers */}
                         <View
                             style={{
+                                backgroundColor: 'white',
+                                borderRadius: 20,
+                                padding: 20,
+                                marginTop: 12,
                                 flexDirection: 'row',
                                 alignItems: 'center',
-                                backgroundColor: stats.todayGrowth >= 0 ? '#E8F5E9' : '#FFE5E5',
-                                paddingHorizontal: 16,
-                                paddingVertical: 12,
-                                borderRadius: 16,
+                                borderWidth: 2,
+                                borderColor: '#F3F4F6',
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.05,
+                                shadowRadius: 8,
+                                elevation: 2,
                             }}
                         >
-                            <Text style={{ 
-                                fontSize: 16, 
-                                fontWeight: '700',
-                                color: stats.todayGrowth >= 0 ? '#10B981' : '#EF4444',
-                                marginRight: 8,
-                            }}>
-                                {stats.todayGrowth >= 0 ? '↑' : '↓'} {Math.abs(stats.todayGrowth).toFixed(1)}%
-                            </Text>
-                            <Text style={{ fontSize: 14, color: '#8B8B8B' }}>
-                                vs yesterday ({stats.yesterdayRevenue.toLocaleString('vi-VN')}đ)
-                            </Text>
+                            <View
+                                style={{
+                                    width: 56,
+                                    height: 56,
+                                    borderRadius: 28,
+                                    backgroundColor: '#F0E7FF',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginRight: 16,
+                                }}
+                            >
+                                <Text style={{ fontSize: 28 }}>👥</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#1A1A1A', marginBottom: 2 }}>
+                                    {stats.totalCustomers}
+                                </Text>
+                                <Text style={{ fontSize: 14, color: '#8B8B8B', fontWeight: '600' }}>
+                                    Total Customers
+                                </Text>
+                            </View>
                         </View>
                     </View>
 
-                    {/* 4 Small Cards */}
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-                        <StatCard
-                            title="Pending Orders"
-                            value={stats.pendingOrders.toString()}
-                            icon={images.clock}
-                            color="#F59E0B"
-                            onPress={() => router.push('/admin/orders')}
-                        />
-                        <StatCard
-                            title="Completed"
-                            value={stats.completedOrders.toString()}
-                            icon={images.check}
-                            color="#10B981"
-                            onPress={() => router.push('/admin/orders')}
-                        />
-                        <StatCard
-                            title="Total Orders"
-                            value={stats.totalOrders.toString()}
-                            icon={images.bag}
-                            color="#6366F1"
-                            onPress={() => router.push('/admin/orders')}
-                        />
-                        <StatCard
-                            title="Customers"
-                            value={stats.totalCustomers.toString()}
-                            icon={images.user}
-                            color="#8B5CF6"
-                            onPress={() => router.push('/admin/customers')}
-                        />
-                    </View>
-
-                    {/* Quick Actions */}
-                    <View style={{ marginTop: 8 }}>
-                        <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1A1A1A', marginBottom: 16 }}>
+                    {/* 🚀 Quick Actions */}
+                    <View>
+                        <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1A1A1A', marginBottom: 16 }}>
                             Quick Actions
                         </Text>
                         
@@ -313,11 +407,10 @@ const Dashboard = () => {
                                 onPress={() => router.push('/admin/orders')}
                                 style={{
                                     flex: 1,
+                                    minWidth: (width - 64) / 2,
                                     backgroundColor: '#6366F1',
                                     borderRadius: 20,
-                                    padding: 20,
-                                    alignItems: 'center',
-                                    minWidth: (width - 60) / 2 - 6,
+                                    padding: 24,
                                     shadowColor: '#6366F1',
                                     shadowOffset: { width: 0, height: 4 },
                                     shadowOpacity: 0.3,
@@ -325,9 +418,12 @@ const Dashboard = () => {
                                     elevation: 4,
                                 }}
                             >
-                                <Text style={{ fontSize: 32, marginBottom: 8 }}>📦</Text>
-                                <Text style={{ fontSize: 14, fontWeight: 'bold', color: 'white' }}>
-                                    View Orders
+                                <Text style={{ fontSize: 36, marginBottom: 12 }}>📦</Text>
+                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'white' }}>
+                                    Manage Orders
+                                </Text>
+                                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 }}>
+                                    View & process orders
                                 </Text>
                             </TouchableOpacity>
 
@@ -335,11 +431,10 @@ const Dashboard = () => {
                                 onPress={() => router.push('/admin/menu')}
                                 style={{
                                     flex: 1,
+                                    minWidth: (width - 64) / 2,
                                     backgroundColor: '#10B981',
                                     borderRadius: 20,
-                                    padding: 20,
-                                    alignItems: 'center',
-                                    minWidth: (width - 60) / 2 - 6,
+                                    padding: 24,
                                     shadowColor: '#10B981',
                                     shadowOffset: { width: 0, height: 4 },
                                     shadowOpacity: 0.3,
@@ -347,9 +442,12 @@ const Dashboard = () => {
                                     elevation: 4,
                                 }}
                             >
-                                <Text style={{ fontSize: 32, marginBottom: 8 }}>🍔</Text>
-                                <Text style={{ fontSize: 14, fontWeight: 'bold', color: 'white' }}>
+                                <Text style={{ fontSize: 36, marginBottom: 12 }}>🍔</Text>
+                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'white' }}>
                                     Manage Menu
+                                </Text>
+                                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 }}>
+                                    Edit menu items
                                 </Text>
                             </TouchableOpacity>
 
@@ -357,11 +455,10 @@ const Dashboard = () => {
                                 onPress={() => router.push('/admin/analytics')}
                                 style={{
                                     flex: 1,
+                                    minWidth: (width - 64) / 2,
                                     backgroundColor: '#F59E0B',
                                     borderRadius: 20,
-                                    padding: 20,
-                                    alignItems: 'center',
-                                    minWidth: (width - 60) / 2 - 6,
+                                    padding: 24,
                                     shadowColor: '#F59E0B',
                                     shadowOffset: { width: 0, height: 4 },
                                     shadowOpacity: 0.3,
@@ -369,9 +466,12 @@ const Dashboard = () => {
                                     elevation: 4,
                                 }}
                             >
-                                <Text style={{ fontSize: 32, marginBottom: 8 }}>📊</Text>
-                                <Text style={{ fontSize: 14, fontWeight: 'bold', color: 'white' }}>
+                                <Text style={{ fontSize: 36, marginBottom: 12 }}>📊</Text>
+                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'white' }}>
                                     Analytics
+                                </Text>
+                                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 }}>
+                                    View detailed reports
                                 </Text>
                             </TouchableOpacity>
 
@@ -379,11 +479,10 @@ const Dashboard = () => {
                                 onPress={() => router.push('/admin/customers')}
                                 style={{
                                     flex: 1,
+                                    minWidth: (width - 64) / 2,
                                     backgroundColor: '#8B5CF6',
                                     borderRadius: 20,
-                                    padding: 20,
-                                    alignItems: 'center',
-                                    minWidth: (width - 60) / 2 - 6,
+                                    padding: 24,
                                     shadowColor: '#8B5CF6',
                                     shadowOffset: { width: 0, height: 4 },
                                     shadowOpacity: 0.3,
@@ -391,9 +490,12 @@ const Dashboard = () => {
                                     elevation: 4,
                                 }}
                             >
-                                <Text style={{ fontSize: 32, marginBottom: 8 }}>👥</Text>
-                                <Text style={{ fontSize: 14, fontWeight: 'bold', color: 'white' }}>
+                                <Text style={{ fontSize: 36, marginBottom: 12 }}>👥</Text>
+                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'white' }}>
                                     Customers
+                                </Text>
+                                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 }}>
+                                    View customer list
                                 </Text>
                             </TouchableOpacity>
                         </View>

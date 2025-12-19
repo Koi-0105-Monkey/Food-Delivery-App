@@ -1,4 +1,4 @@
-// app/admin/analytics.tsx - REAL DATA + LINE CHART + INTERACTIVE
+// app/admin/analytics.tsx - DETAILED ANALYTICS WITH FULL DATA
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Dimensions, RefreshControl, Animated, TouchableOpacity } from 'react-native';
@@ -13,22 +13,35 @@ type TimeRange = '1day' | '1week' | '1month' | 'all';
 
 const AdminAnalytics = () => {
     const [analytics, setAnalytics] = useState({
+        // Revenue breakdown
         totalRevenue: 0,
         todayRevenue: 0,
         weekRevenue: 0,
         monthRevenue: 0,
+        
+        // Comparison
         yesterdayRevenue: 0,
         lastWeekRevenue: 0,
         lastMonthRevenue: 0,
+        
+        // Growth rates
         todayGrowth: 0,
         weekGrowth: 0,
         monthGrowth: 0,
+        
+        // Order statistics
         totalOrders: 0,
+        completedOrders: 0,
+        cancelledOrders: 0,
         avgOrderValue: 0,
+        
+        // Payment methods
         topPaymentMethod: 'COD',
+        paymentMethodsData: [] as any[],
+        
+        // Chart data
         last7DaysRevenue: [] as any[],
         last30DaysRevenue: [] as any[],
-        paymentMethodsData: [] as any[],
     });
     const [loading, setLoading] = useState(true);
     const [selectedRange, setSelectedRange] = useState<TimeRange>('1week');
@@ -128,7 +141,7 @@ const AdminAnalytics = () => {
                 })
                 .reduce((sum: number, order: any) => sum + order.total, 0);
 
-            // ✅ REAL GROWTH
+            // Growth calculations
             const todayGrowth = yesterdayRevenue > 0 
                 ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100 
                 : (todayRevenue > 0 ? 100 : 0);
@@ -158,7 +171,7 @@ const AdminAnalytics = () => {
                 percentage: ((value / paidOrders.length) * 100).toFixed(1),
             }));
 
-            // Last 7 days
+            // Last 7 days chart
             const last7DaysRevenue = [];
             for (let i = 6; i >= 0; i--) {
                 const date = new Date();
@@ -181,7 +194,7 @@ const AdminAnalytics = () => {
                 });
             }
 
-            // Last 30 days
+            // Last 30 days chart
             const last30DaysRevenue = [];
             for (let i = 29; i >= 0; i--) {
                 const date = new Date();
@@ -204,6 +217,15 @@ const AdminAnalytics = () => {
                 });
             }
 
+            // Order status counts
+            const completedOrders = orders.documents.filter(
+                (order: any) => order.order_status === 'confirmed'
+            ).length;
+
+            const cancelledOrders = orders.documents.filter(
+                (order: any) => order.order_status === 'cancelled'
+            ).length;
+
             setAnalytics({
                 totalRevenue,
                 todayRevenue,
@@ -216,6 +238,8 @@ const AdminAnalytics = () => {
                 weekGrowth,
                 monthGrowth,
                 totalOrders: paidOrders.length,
+                completedOrders,
+                cancelledOrders,
                 avgOrderValue,
                 topPaymentMethod,
                 last7DaysRevenue,
@@ -269,6 +293,10 @@ const AdminAnalytics = () => {
         }
     };
 
+    const formatCurrency = (amount: number) => {
+        return amount.toLocaleString('vi-VN') + 'đ';
+    };
+
     const chartData = getChartData();
 
     return (
@@ -290,7 +318,27 @@ const AdminAnalytics = () => {
                         </Text>
                     </View>
 
-                    {/* Revenue Card with Growth */}
+                    {/* Revenue Overview Cards */}
+                    <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+                        <View style={{ flex: 1, backgroundColor: 'white', borderRadius: 20, padding: 20 }}>
+                            <Text style={{ fontSize: 13, color: '#8B8B8B', fontWeight: '600', marginBottom: 8 }}>
+                                Total Revenue
+                            </Text>
+                            <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#1A1A1A' }}>
+                                {formatCurrency(analytics.totalRevenue)}
+                            </Text>
+                        </View>
+                        <View style={{ flex: 1, backgroundColor: 'white', borderRadius: 20, padding: 20 }}>
+                            <Text style={{ fontSize: 13, color: '#8B8B8B', fontWeight: '600', marginBottom: 8 }}>
+                                Avg Order Value
+                            </Text>
+                            <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#1A1A1A' }}>
+                                {formatCurrency(analytics.avgOrderValue)}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Period Revenue with Growth */}
                     <View
                         style={{
                             backgroundColor: 'white',
@@ -324,10 +372,7 @@ const AdminAnalytics = () => {
                                 </Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
                                     <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#1A1A1A' }}>
-                                        ${(getCurrentRevenue() / 1000).toFixed(0)}
-                                    </Text>
-                                    <Text style={{ fontSize: 18, color: '#8B8B8B', marginLeft: 4 }}>
-                                        K đ
+                                        {formatCurrency(getCurrentRevenue())}
                                     </Text>
                                 </View>
                             </View>
@@ -350,7 +395,7 @@ const AdminAnalytics = () => {
                         </View>
                     </View>
 
-                    {/* 📊 LINE CHART - Sales Report */}
+                    {/* Line Chart */}
                     <View
                         style={{
                             backgroundColor: 'white',
@@ -396,7 +441,7 @@ const AdminAnalytics = () => {
                             ))}
                         </View>
 
-                        {/* Line Chart */}
+                        {/* Chart */}
                         {chartData.length > 0 ? (
                             <LineChart
                                 data={{
@@ -440,6 +485,47 @@ const AdminAnalytics = () => {
                         )}
                     </View>
 
+                    {/* Order Statistics */}
+                    <View
+                        style={{
+                            backgroundColor: 'white',
+                            borderRadius: 24,
+                            padding: 20,
+                            marginBottom: 16,
+                        }}
+                    >
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1A1A1A', marginBottom: 16 }}>
+                            📦 Order Statistics
+                        </Text>
+                        
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                            <View style={{ flex: 1, backgroundColor: '#F3F4F6', borderRadius: 16, padding: 16 }}>
+                                <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#1A1A1A', marginBottom: 4 }}>
+                                    {analytics.totalOrders}
+                                </Text>
+                                <Text style={{ fontSize: 13, color: '#8B8B8B', fontWeight: '600' }}>
+                                    Total Orders
+                                </Text>
+                            </View>
+                            <View style={{ flex: 1, backgroundColor: '#E8F5E9', borderRadius: 16, padding: 16 }}>
+                                <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#10B981', marginBottom: 4 }}>
+                                    {analytics.completedOrders}
+                                </Text>
+                                <Text style={{ fontSize: 13, color: '#8B8B8B', fontWeight: '600' }}>
+                                    Completed
+                                </Text>
+                            </View>
+                            <View style={{ flex: 1, backgroundColor: '#FFE5E5', borderRadius: 16, padding: 16 }}>
+                                <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#EF4444', marginBottom: 4 }}>
+                                    {analytics.cancelledOrders}
+                                </Text>
+                                <Text style={{ fontSize: 13, color: '#8B8B8B', fontWeight: '600' }}>
+                                    Cancelled
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+
                     {/* Payment Methods */}
                     <View
                         style={{
@@ -447,11 +533,6 @@ const AdminAnalytics = () => {
                             borderRadius: 24,
                             padding: 20,
                             marginBottom: 16,
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 4 },
-                            shadowOpacity: 0.08,
-                            shadowRadius: 12,
-                            elevation: 3,
                         }}
                     >
                         <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1A1A1A', marginBottom: 16 }}>
