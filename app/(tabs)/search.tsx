@@ -1,11 +1,11 @@
-// app/(tabs)/search.tsx - FIXED VERSION
+// app/(tabs)/search.tsx - OPTIMIZED VERSION
 
 import { FlatList, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import useAppwrite from '@/lib/useAppwrite';
 import { getCategories, getMenu } from '@/lib/appwrite';
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import CartButton from '@/components/CartButton';
 import cn from 'clsx';
 import MenuCard from '@/components/MenuCard';
@@ -13,42 +13,77 @@ import { MenuItem, Category } from '@/type';
 import Filter from '@/components/Filter';
 import SearchBar from '@/components/SearchBar';
 
+// ✅ FIX 2: Cache để tránh gọi API lại khi không cần
+const cache = new Map<string, MenuItem[]>();
+
 const Search = () => {
     const { category, query } = useLocalSearchParams<{ query?: string; category?: string }>();
-
-    const { data, refetch, loading } = useAppwrite({ 
-        fn: getMenu, 
-        params: { 
-            category: category || '', 
-            query: query || '', 
-            limit: 6 
-        } 
-    });
+    const [localData, setLocalData] = useState<MenuItem[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
     
-    // ✅ FIXED: Add default empty array fallback
+    // ✅ FIX 3: Debounce search query
+    const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     const { data: categories } = useAppwrite({ 
         fn: getCategories,
         params: {} as any 
     });
 
-    useEffect(() => {
-        refetch({ 
-            category: category || '', 
-            query: query || '', 
-            limit: 6 
-        });
+    const categoryList = (categories || []) as Category[];
+
+    // ✅ Load data with caching
+    const loadData = useCallback(async () => {
+        const cacheKey = `${category || 'all'}-${query || ''}`;
+        
+        // Check cache first
+        if (cache.has(cacheKey)) {
+            console.log('✅ Using cached data for:', cacheKey);
+            setLocalData(cache.get(cacheKey)!);
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const items = await getMenu({ 
+                category: category || '', 
+                query: query || ''
+            });
+            
+            const menuItems = items as MenuItem[];
+            cache.set(cacheKey, menuItems); // Save to cache
+            setLocalData(menuItems);
+            
+            console.log(`✅ Loaded ${menuItems.length} items`);
+        } catch (error) {
+            console.error('Failed to load menu:', error);
+        } finally {
+            setIsLoading(false);
+        }
     }, [category, query]);
 
-    // ✅ FIXED: Ensure categories is always an array
-    const categoryList = (categories || []) as Category[];
+    // ✅ Debounced search
+    useEffect(() => {
+        if (searchTimeoutRef.current !== null) {
+            clearTimeout(searchTimeoutRef.current);
+        }
+
+        searchTimeoutRef.current = setTimeout(() => {
+            loadData();
+        }, 500); // ✅ Wait 500ms before searching
+
+        return () => {
+            if (searchTimeoutRef.current !== null) {
+                clearTimeout(searchTimeoutRef.current);
+            }
+        };
+    }, [category, query, loadData]);
 
     return (
         <SafeAreaView className="bg-white h-full">
             <FlatList
-                data={data}
+                data={localData}
                 renderItem={({ item, index }) => {
                     const isFirstRightColItem = index % 2 === 0;
-
                     return (
                         <View className={cn('flex-1 max-w-[48%]', !isFirstRightColItem ? 'mt-10' : 'mt-0')}>
                             <MenuCard item={item as MenuItem} />
@@ -70,18 +105,14 @@ const Search = () => {
                                     </Text>
                                 </View>
                             </View>
-
                             <CartButton />
                         </View>
-
                         <SearchBar />
-
-                        {/* ✅ FIXED: Pass categoryList instead of categories */}
                         <Filter categories={categoryList} />
                     </View>
                 )}
                 ListEmptyComponent={() => 
-                    !loading ? (
+                    !isLoading ? (
                         <View className="flex-center py-20">
                             <Text className="paragraph-medium text-gray-200">No results found</Text>
                         </View>
