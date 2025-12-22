@@ -81,6 +81,7 @@ npx expo install react-native-chart-kit react-native-svg
 npm install web3 solc crypto-js
 npm install web3@4.3.0 react-native-sha256
 npm install solc@0.8.17
+npx expo install react-native-get-random-values
 ```
 
 **Set Up Environment Variables**
