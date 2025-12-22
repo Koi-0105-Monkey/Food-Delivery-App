@@ -1,4 +1,4 @@
-// components/CardPaymentModal.tsx - WITH CANCEL HANDLING
+// components/CardPaymentModal.tsx - BLOCKCHAIN VERSION (NO ERRORS)
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -15,6 +15,10 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { images } from '@/constants';
+
+// ✅ Import blockchain services
+import { blockchainService } from '@/lib/blockchain';
+import { CardInfo } from '@/lib/cardToWallet';
 
 export interface CardPaymentData {
     cardNumber: string;
@@ -84,7 +88,6 @@ const CardPaymentModal = ({
         }
     }, [visible]);
 
-    // ✅ Handle Cancel with confirmation
     const handleClose = () => {
         Alert.alert(
             'Cancel Payment?',
@@ -98,24 +101,20 @@ const CardPaymentModal = ({
                     text: 'Cancel',
                     style: 'destructive',
                     onPress: () => {
-                        // ✅ Log cancellation to terminal
                         console.log('⚠️ ========== PAYMENT CANCELLED ==========');
                         console.log('📦 Order:', orderNumber);
                         console.log('💰 Amount:', totalAmount.toLocaleString('vi-VN') + 'đ');
                         console.log('🔄 Status: Moved to Pending Orders');
                         console.log('==========================================');
 
-                        // Call callback to handle pending state
                         if (onCancelToPending) {
                             onCancelToPending();
                         }
 
-                        // Refresh orders list
                         if (onRefresh) {
                             onRefresh();
                         }
 
-                        // Close modal with animation
                         Animated.parallel([
                             Animated.timing(slideAnim, {
                                 toValue: Dimensions.get('window').height,
@@ -139,7 +138,7 @@ const CardPaymentModal = ({
     const formatCardNumber = (text: string) => {
         const cleaned = text.replace(/\s/g, '');
         const groups = cleaned.match(/.{1,4}/g) || [];
-        return groups.join(' ').substring(0, 19); // Max 16 digits + 3 spaces
+        return groups.join(' ').substring(0, 19);
     };
 
     const formatExpiryDate = (text: string) => {
@@ -150,8 +149,9 @@ const CardPaymentModal = ({
         return cleaned;
     };
 
+    // ✅ MAIN PAYMENT HANDLER - BLOCKCHAIN VERSION
     const handleConfirm = async () => {
-        // Validation
+        // ========== VALIDATION ==========
         const cardNumber = form.cardNumber.replace(/\s/g, '');
         
         if (cardNumber.length < 13 || cardNumber.length > 19) {
@@ -172,11 +172,86 @@ const CardPaymentModal = ({
 
         setIsProcessing(true);
 
-        // Simulate payment processing
-        setTimeout(() => {
+        try {
+            console.log('💳 ========== BLOCKCHAIN PAYMENT START ==========');
+            console.log('📦 Order:', orderNumber);
+            console.log('💰 Amount:', totalAmount.toLocaleString('vi-VN'), 'VND');
+            console.log('🎴 Card:', '**** **** ****', cardNumber.slice(-4));
+            
+            // ========== PREPARE CARD INFO ==========
+            const cardInfo: CardInfo = {
+                cardNumber: form.cardNumber,
+                cardHolder: form.cardHolder,
+                expiryDate: form.expiryDate, // ✅ FIXED: No space in variable name
+                cvv: form.cvv
+            };
+
+            // ========== PROCESS VIA BLOCKCHAIN ==========
+            console.log('🔗 Calling blockchain service...');
+            
+            const result = await blockchainService.processPayment(
+                orderNumber,
+                totalAmount,
+                cardInfo
+            );
+
+            if (!result.success) {
+                throw new Error(result.error || 'Payment failed');
+            }
+
+            console.log('✅ Blockchain payment successful!');
+            console.log('📝 TX Hash:', result.transactionHash);
+            console.log('🧱 Block:', result.blockNumber);
+            console.log('⛽ Gas Used:', result.gasUsed);
+
+            // ========== UPDATE APPWRITE ==========
+            // Note: updatePaymentStatus được import từ lib/payment.ts
+            // Bạn cần import nó ở đầu file:
+            // import { updatePaymentStatus } from '@/lib/payment';
+            
+            if (orderId) {
+                console.log('💾 Updating Appwrite...');
+                
+                // ✅ FIX: Import function này từ lib/payment.ts
+                const { updatePaymentStatus } = require('@/lib/payment');
+                
+                await updatePaymentStatus(
+                    orderId,
+                    'paid',
+                    result.transactionHash // Lưu blockchain TX hash
+                );
+                
+                console.log('✅ Appwrite updated with TX hash');
+            }
+
+            console.log('========== PAYMENT COMPLETE ==========\n');
+
+            // ========== SUCCESS ==========
+            Alert.alert(
+                'Payment Successful! 🎉',
+                `Blockchain Transaction:\n${result.transactionHash?.substring(0, 20)}...\n\nYour order has been confirmed and recorded on blockchain.`,
+                [
+                    {
+                        text: 'View Order',
+                        onPress: async () => {
+                            await onConfirmPayment(form);
+                        }
+                    }
+                ]
+            );
+
+        } catch (error: any) {
+            console.error('❌ ========== PAYMENT FAILED ==========');
+            console.error('Error:', error.message);
+            console.error('=========================================\n');
+            
+            Alert.alert(
+                'Payment Failed',
+                error.message || 'Unable to process payment. Please check:\n\n• Ganache is running\n• Contract is deployed\n• Wallet has sufficient balance'
+            );
+        } finally {
             setIsProcessing(false);
-            onConfirmPayment(form);
-        }, 2000);
+        }
     };
 
     if (!visible) return null;
@@ -225,7 +300,9 @@ const CardPaymentModal = ({
                         }}
                     >
                         <View>
-                            <Text className="h3-bold text-dark-100">Card Payment</Text>
+                            <Text className="h3-bold text-dark-100">
+                                💳 Blockchain Payment
+                            </Text>
                             <Text className="body-regular text-gray-200 mt-1">
                                 Order: {orderNumber}
                             </Text>
@@ -253,6 +330,30 @@ const CardPaymentModal = ({
                         <Text className="h1-bold text-primary" style={{ fontSize: 36 }}>
                             {totalAmount.toLocaleString('vi-VN')}đ
                         </Text>
+                        <Text className="small-bold text-gray-200 mt-2">
+                            ≈ {(totalAmount / 25000).toFixed(4)} ETH
+                        </Text>
+                    </View>
+
+                    {/* Blockchain Info Banner */}
+                    <View
+                        style={{
+                            backgroundColor: '#E3F2FD',
+                            borderRadius: 15,
+                            padding: 15,
+                            marginBottom: 20,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 10,
+                        }}
+                    >
+                        <Text style={{ fontSize: 24 }}>🔗</Text>
+                        <View style={{ flex: 1 }}>
+                            <Text className="body-medium text-dark-100">
+                                <Text className="base-bold">Blockchain Payment</Text>
+                                {'\n'}Your payment will be recorded on Ethereum blockchain
+                            </Text>
+                        </View>
                     </View>
 
                     {/* Card Form */}
@@ -323,6 +424,25 @@ const CardPaymentModal = ({
                         </View>
                     </View>
 
+                    {/* Test Cards Helper */}
+                    <View
+                        style={{
+                            backgroundColor: '#E8F5E9',
+                            borderRadius: 15,
+                            padding: 15,
+                            marginTop: 20,
+                        }}
+                    >
+                        <Text className="body-medium text-dark-100 mb-2">
+                            🧪 <Text className="base-bold">Test Cards Available:</Text>
+                        </Text>
+                        <Text className="body-regular text-gray-200" style={{ lineHeight: 20 }}>
+                            • 4532 1111 1111 1234{'\n'}
+                            • 5425 2222 2222 5678{'\n'}
+                            Holder: ANY NAME, Expiry: ANY, CVV: ANY
+                        </Text>
+                    </View>
+
                     {/* Security Notice */}
                     <View
                         style={{
@@ -342,7 +462,7 @@ const CardPaymentModal = ({
                             tintColor="#2F9B65"
                         />
                         <Text className="body-regular text-gray-200" style={{ flex: 1 }}>
-                            Your card information is encrypted and secure
+                            Your payment is secured by blockchain technology
                         </Text>
                     </View>
 
@@ -362,7 +482,7 @@ const CardPaymentModal = ({
                             <ActivityIndicator color="white" />
                         ) : (
                             <Text className="base-bold text-white">
-                                Confirm Payment
+                                🔗 Pay via Blockchain
                             </Text>
                         )}
                     </TouchableOpacity>

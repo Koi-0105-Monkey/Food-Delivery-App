@@ -72,14 +72,15 @@ npm install
 npx expo install expo-image-picker
 npx expo install react-native-webview
 npx expo install expo-haptics
-npm install crypto-js
 npm install --save-dev @types/crypto-js
 npm install express
 npm install qrcode
 npm install vietqr
 npm install express node-appwrite
 npx expo install react-native-chart-kit react-native-svg
-
+npm install web3 solc crypto-js
+npm install web3@4.3.0 react-native-sha256
+npm install solc@0.8.17
 ```
 
 **Set Up Environment Variables**
