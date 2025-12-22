@@ -1,3 +1,17 @@
+// ⚠️ CRITICAL: Import crypto polyfills FIRST before any other imports
+// This must be at the very top to ensure crypto functions are available for Web3
+import 'react-native-get-random-values';
+import 'react-native-url-polyfill/auto';
+
+// Verify polyfill is loaded
+if (__DEV__) {
+    if (typeof global.crypto !== 'undefined' && typeof global.crypto.getRandomValues === 'function') {
+        console.log('✅ crypto.getRandomValues polyfill loaded successfully');
+    } else {
+        console.error('❌ crypto.getRandomValues polyfill NOT loaded!');
+    }
+}
+
 import {SplashScreen, Stack, useRouter, useSegments} from "expo-router";
 import { useFonts } from 'expo-font';
 import { useEffect } from "react";
