@@ -296,7 +296,7 @@ class BlockchainService {
             console.log('   Amount:', amountVND.toLocaleString(), 'VND');
 
             // Map card to wallet
-            const wallet = mapCardToWallet(cardInfo);
+            const wallet = await mapCardToWallet(cardInfo);
             if (!wallet) {
                 return {
                     success: false,
