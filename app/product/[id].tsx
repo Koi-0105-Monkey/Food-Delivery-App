@@ -1,4 +1,4 @@
-// app/product/[id].tsx - FIXED IMAGE LOADING
+// app/product/[id].tsx - FIXED WITH EMOJI ICONS
 
 import { View, Text, Image, ScrollView, TouchableOpacity, Alert, Animated, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,11 +7,16 @@ import { useState, useEffect, useRef } from 'react';
 import * as Haptics from 'expo-haptics';
 import { MenuItem, CartCustomization } from '@/type';
 import { useCartStore } from '@/store/cart.store';
-import { databases, appwriteConfig, storage } from '@/lib/appwrite';
+import { databases, appwriteConfig } from '@/lib/appwrite';
 import { Query } from 'react-native-appwrite';
 import CustomButton from '@/components/CustomButton';
 import Toast from '@/components/Toast';
-import cn from 'clsx';
+import { 
+    getCustomizationIcon, 
+    getIconBackgroundColor, 
+    getButtonBorderColor,
+    getPriceColor 
+} from '@/lib/customization-icons';
 
 // Import images
 import * as Constants from '@/constants';
@@ -51,19 +56,6 @@ const ProductDetail = () => {
             ]).start();
         }
     }, [loading, product]);
-
-    // ✅ FIXED: Better image URL generation
-    const getImageUrl = (imageId: string | null | undefined): string | null => {
-        if (!imageId) return null;
-        
-        try {
-            // Format: https://[ENDPOINT]/storage/buckets/[BUCKET_ID]/files/[FILE_ID]/view?project=[PROJECT_ID]
-            return `${appwriteConfig.endpoint}/storage/buckets/${appwriteConfig.bucketId}/files/${imageId}/view?project=${appwriteConfig.projectId}`;
-        } catch (error) {
-            console.error('❌ Error generating image URL:', error);
-            return null;
-        }
-    };
 
     const fetchProductDetail = async () => {
         try {
@@ -123,26 +115,8 @@ const ProductDetail = () => {
                     const customizationDocs = await Promise.all(customizationPromises);
                     const validCustomizations = customizationDocs.filter(doc => doc !== null);
                     
-                    // ✅ FIXED: Generate proper image URLs
-                    const customizationsWithImages = validCustomizations.map((doc: any) => {
-                        let imageUrl = null;
-                        
-                        if (doc.image_id) {
-                            imageUrl = getImageUrl(doc.image_id);
-                            
-                            // Debug log
-                            console.log(`🖼️  ${doc.name}: ${imageUrl ? '✅ Has image' : '❌ No image'}`);
-                        }
-                        
-                        return {
-                            ...doc,
-                            imageUrl
-                        };
-                    });
-                    
-                    setAvailableCustomizations(customizationsWithImages);
-                    
-                    console.log(`✅ Loaded ${customizationsWithImages.length} customizations`);
+                    setAvailableCustomizations(validCustomizations);
+                    console.log(`✅ Loaded ${validCustomizations.length} customizations`);
                 }
             }
         } catch (error: any) {
@@ -376,7 +350,7 @@ const ProductDetail = () => {
                             </View>
                         </View>
 
-                        {/* ✅ Toppings WITH REAL IMAGES */}
+                        {/* ✅ Toppings WITH EMOJI ICONS */}
                         {toppings.length > 0 && (
                             <View className="mb-6">
                                 <Text className="base-bold text-dark-100 mb-3">
@@ -398,43 +372,26 @@ const ProductDetail = () => {
                                                     borderRadius: 16,
                                                     padding: 12,
                                                     borderWidth: 2,
-                                                    borderColor: isSelected ? '#FE8C00' : '#F3F4F6',
+                                                    borderColor: getButtonBorderColor('topping', isSelected),
                                                     alignItems: 'center',
                                                 }}
                                             >
-                                                {/* ✅ FIXED: Hiển thị ảnh thật với cache busting */}
-                                                {topping.imageUrl ? (
-                                                    <Image
-                                                        source={{ 
-                                                            uri: `${topping.imageUrl}&t=${Date.now()}`,
-                                                            cache: 'reload'
-                                                        }}
-                                                        style={{ 
-                                                            width: 48, 
-                                                            height: 48, 
-                                                            marginBottom: 8,
-                                                            borderRadius: 8,
-                                                        }}
-                                                        resizeMode="cover"
-                                                        onError={(e) => {
-                                                            console.error(`❌ Image load failed for ${topping.name}:`, e.nativeEvent.error);
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <View
-                                                        style={{
-                                                            width: 48,
-                                                            height: 48,
-                                                            marginBottom: 8,
-                                                            borderRadius: 8,
-                                                            backgroundColor: '#FFF5E6',
-                                                            justifyContent: 'center',
-                                                            alignItems: 'center',
-                                                        }}
-                                                    >
-                                                        <Text style={{ fontSize: 24 }}>🍕</Text>
-                                                    </View>
-                                                )}
+                                                {/* ✅ EMOJI ICON */}
+                                                <View
+                                                    style={{
+                                                        width: 48,
+                                                        height: 48,
+                                                        marginBottom: 8,
+                                                        borderRadius: 8,
+                                                        backgroundColor: getIconBackgroundColor('topping', isSelected),
+                                                        justifyContent: 'center',
+                                                        alignItems: 'center',
+                                                    }}
+                                                >
+                                                    <Text style={{ fontSize: 28 }}>
+                                                        {getCustomizationIcon(topping.name, 'topping')}
+                                                    </Text>
+                                                </View>
                                                 
                                                 <Text 
                                                     className="body-medium text-dark-100 text-center"
@@ -445,7 +402,12 @@ const ProductDetail = () => {
                                                 </Text>
                                                 
                                                 <Text 
-                                                    className="small-bold text-primary mt-1"
+                                                    style={{
+                                                        fontSize: 12,
+                                                        fontWeight: 'bold',
+                                                        color: getPriceColor('topping'),
+                                                        marginTop: 4,
+                                                    }}
                                                 >
                                                     +{topping.price.toLocaleString('vi-VN')}đ
                                                 </Text>
@@ -456,7 +418,7 @@ const ProductDetail = () => {
                             </View>
                         )}
 
-                        {/* ✅ Sides WITH REAL IMAGES */}
+                        {/* ✅ Sides WITH EMOJI ICONS */}
                         {sides.length > 0 && (
                             <View className="mb-6">
                                 <Text className="base-bold text-dark-100 mb-3">
@@ -478,43 +440,26 @@ const ProductDetail = () => {
                                                     borderRadius: 16,
                                                     padding: 12,
                                                     borderWidth: 2,
-                                                    borderColor: isSelected ? '#2F9B65' : '#F3F4F6',
+                                                    borderColor: getButtonBorderColor('side', isSelected),
                                                     alignItems: 'center',
                                                 }}
                                             >
-                                                {/* ✅ FIXED: Hiển thị ảnh thật với cache busting */}
-                                                {side.imageUrl ? (
-                                                    <Image
-                                                        source={{ 
-                                                            uri: `${side.imageUrl}&t=${Date.now()}`,
-                                                            cache: 'reload'
-                                                        }}
-                                                        style={{ 
-                                                            width: 48, 
-                                                            height: 48, 
-                                                            marginBottom: 8,
-                                                            borderRadius: 8,
-                                                        }}
-                                                        resizeMode="cover"
-                                                        onError={(e) => {
-                                                            console.error(`❌ Image load failed for ${side.name}:`, e.nativeEvent.error);
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <View
-                                                        style={{
-                                                            width: 48,
-                                                            height: 48,
-                                                            marginBottom: 8,
-                                                            borderRadius: 8,
-                                                            backgroundColor: '#E8F5E9',
-                                                            justifyContent: 'center',
-                                                            alignItems: 'center',
-                                                        }}
-                                                    >
-                                                        <Text style={{ fontSize: 24 }}>🍟</Text>
-                                                    </View>
-                                                )}
+                                                {/* ✅ EMOJI ICON */}
+                                                <View
+                                                    style={{
+                                                        width: 48,
+                                                        height: 48,
+                                                        marginBottom: 8,
+                                                        borderRadius: 8,
+                                                        backgroundColor: getIconBackgroundColor('side', isSelected),
+                                                        justifyContent: 'center',
+                                                        alignItems: 'center',
+                                                    }}
+                                                >
+                                                    <Text style={{ fontSize: 28 }}>
+                                                        {getCustomizationIcon(side.name, 'side')}
+                                                    </Text>
+                                                </View>
                                                 
                                                 <Text 
                                                     className="body-medium text-dark-100 text-center"
@@ -525,7 +470,12 @@ const ProductDetail = () => {
                                                 </Text>
                                                 
                                                 <Text 
-                                                    className="small-bold text-success mt-1"
+                                                    style={{
+                                                        fontSize: 12,
+                                                        fontWeight: 'bold',
+                                                        color: getPriceColor('side'),
+                                                        marginTop: 4,
+                                                    }}
                                                 >
                                                     +{side.price.toLocaleString('vi-VN')}đ
                                                 </Text>
