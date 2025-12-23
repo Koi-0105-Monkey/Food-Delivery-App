@@ -19,8 +19,8 @@
  * Dùng wallet này để thanh toán trên blockchain
  */
 
-// ✅ FIX: Use built-in crypto for React Native
-import { sha256 } from 'react-native-sha256';
+// ✅ FIX: Use crypto-js for hashing (more reliable in React Native)
+import CryptoJS from 'crypto-js';
 
 /**
  * 🎴 FAKE CREDIT CARDS → GANACHE WALLETS
@@ -123,9 +123,10 @@ export const TEST_CARDS = [
 /**
  * Hash credit card number to deterministic index
  */
-async function hashCardToIndex(cardNumber: string): Promise<number> {
+function hashCardToIndex(cardNumber: string): number {
     const cleaned = cardNumber.replace(/\s/g, '');
-    const hash = await sha256(cleaned);
+    // Use crypto-js SHA256 for reliable hashing
+    const hash = CryptoJS.SHA256(cleaned).toString();
     const numericHash = parseInt(hash.substring(0, 8), 16);
     return numericHash % GANACHE_WALLETS.length;
 }
@@ -158,7 +159,7 @@ export async function mapCardToWallet(cardInfo: CardInfo): Promise<WalletMapping
         }
         
         // Map to wallet using hash
-        const walletIndex = await hashCardToIndex(cardInfo.cardNumber);
+        const walletIndex = hashCardToIndex(cardInfo.cardNumber);
         const wallet = GANACHE_WALLETS[walletIndex];
         
         console.log('✅ Card mapped to wallet:');

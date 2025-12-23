@@ -1,10 +1,81 @@
 import { Account, Avatars, Client, Databases, ID, Query, Storage } from 'react-native-appwrite';
 import { CreateUserParams, GetMenuParams, SignInParams, User } from '@/type';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+
+// Automatically detect platform from app configuration
+const getPlatform = (): string => {
+    let detectedPlatform: string | null = null;
+    let source = '';
+    
+    // Priority 1: Auto-detect from Expo Constants (Android package or iOS bundle identifier)
+    // This takes precedence because app.json is the source of truth
+    const androidPackage = Constants.expoConfig?.android?.package;
+    const iosBundleId = Constants.expoConfig?.ios?.bundleIdentifier;
+    
+    if (Platform.OS === 'android' && androidPackage) {
+        detectedPlatform = androidPackage;
+        source = 'app.json android.package';
+    } else if (Platform.OS === 'ios' && iosBundleId) {
+        detectedPlatform = iosBundleId;
+        source = 'app.json ios.bundleIdentifier';
+    }
+    
+    // Priority 2: Try to get from manifest (for runtime)
+    if (!detectedPlatform) {
+        const manifest = (Constants as any)?.manifest || (Constants as any)?.manifest2;
+        const manifestPackage = manifest?.android?.package || 
+                               manifest?.extra?.expoClient?.android?.package;
+        
+        if (manifestPackage) {
+            detectedPlatform = manifestPackage;
+            source = 'Expo manifest';
+        }
+    }
+    
+    // Priority 3: Use environment variable as fallback (only if app.json not found)
+    if (!detectedPlatform && process.env.EXPO_PUBLIC_APPWRITE_PLATFORM) {
+        detectedPlatform = process.env.EXPO_PUBLIC_APPWRITE_PLATFORM;
+        source = 'EXPO_PUBLIC_APPWRITE_PLATFORM env variable (fallback)';
+    }
+    
+    // Priority 4: Try Constants.executionEnvironment (last resort)
+    if (!detectedPlatform && Platform.OS === 'android') {
+        const executionEnv = (Constants as any)?.executionEnvironment;
+        // Sometimes package info is in different places
+        const altPackage = (Constants as any)?.appOwnership === 'expo' 
+            ? (Constants as any)?.manifest?.slug 
+            : null;
+        
+        if (altPackage && typeof altPackage === 'string' && altPackage.includes('.')) {
+            detectedPlatform = altPackage;
+            source = 'Constants alternative';
+        }
+    }
+    
+    if (!detectedPlatform) {
+        throw new Error(
+            'Appwrite platform not configured. Please set EXPO_PUBLIC_APPWRITE_PLATFORM in your .env file ' +
+            'or ensure your app.json has the correct Android package/iOS bundle identifier.'
+        );
+    }
+    
+    // Log for debugging
+    if (__DEV__) {
+        console.log(`🔧 Appwrite Platform Detection:`);
+        console.log(`   Platform: ${detectedPlatform}`);
+        console.log(`   Source: ${source}`);
+        console.log(`   OS: ${Platform.OS}`);
+        console.log(`   Env var: ${process.env.EXPO_PUBLIC_APPWRITE_PLATFORM || 'not set'}`);
+    }
+    
+    return detectedPlatform;
+};
 
 export const appwriteConfig = {
     endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!,
     projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!,
-    platform: process.env.EXPO_PUBLIC_APPWRITE_PLATFORM!,
+    platform: getPlatform(),
     databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
     bucketId: process.env.EXPO_PUBLIC_APPWRITE_BUCKET_ID!,
     userCollectionId: process.env.EXPO_PUBLIC_APPWRITE_USERS_COLLECTION_ID!,
@@ -18,6 +89,18 @@ export const appwriteConfig = {
 };
 
 export const client = new Client();
+
+// Validate and warn if platform doesn't match expected
+const expectedPlatform = 'com.yourcompany.fastfood';
+if (__DEV__ && appwriteConfig.platform !== expectedPlatform) {
+    console.warn('⚠️  Appwrite Platform Mismatch:');
+    console.warn(`   Expected: ${expectedPlatform} (from app.json)`);
+    console.warn(`   Detected: ${appwriteConfig.platform}`);
+    console.warn(`   If you see "Invalid Origin" errors, make sure:`);
+    console.warn(`   1. The platform "${appwriteConfig.platform}" is registered in Appwrite console`);
+    console.warn(`   2. Or update app.json to match "${appwriteConfig.platform}"`);
+    console.warn(`   3. Or clear cache: npx expo start --clear`);
+}
 
 client
     .setEndpoint(appwriteConfig.endpoint)

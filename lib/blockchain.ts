@@ -1,6 +1,17 @@
 // lib/blockchain.ts
 // Main blockchain integration for payment processing
 
+// ⚠️ CRITICAL: Import crypto polyfills FIRST before Web3
+// This ensures crypto.getRandomValues is available when Web3 initializes
+import 'react-native-get-random-values';
+import 'react-native-url-polyfill/auto';
+
+// Verify crypto polyfill is loaded
+if (typeof global.crypto === 'undefined' || typeof global.crypto.getRandomValues !== 'function') {
+    console.error('❌ crypto.getRandomValues polyfill not loaded!');
+    throw new Error('crypto.getRandomValues polyfill must be imported before Web3');
+}
+
 import Web3 from 'web3';
 import { Contract } from 'web3-eth-contract';
 import { CardInfo, mapCardToWallet, WalletMapping } from './cardToWallet';
@@ -285,7 +296,7 @@ class BlockchainService {
             console.log('   Amount:', amountVND.toLocaleString(), 'VND');
 
             // Map card to wallet
-            const wallet = mapCardToWallet(cardInfo);
+            const wallet = await mapCardToWallet(cardInfo);
             if (!wallet) {
                 return {
                     success: false,

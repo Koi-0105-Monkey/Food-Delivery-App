@@ -92,7 +92,9 @@ Create a new file named `.env` in the root of your project and add the following
 # Appwrite Project Settings
 EXPO_PUBLIC_APPWRITE_PROJECT_ID=
 EXPO_PUBLIC_APPWRITE_ENDPOINT=
-EXPO_PUBLIC_APPWRITE_PLATFORM=
+# EXPO_PUBLIC_APPWRITE_PLATFORM= (Optional - auto-detected from app.json)
+# Platform will be automatically detected from your Android package name (com.yourcompany.fastfood)
+# Only set this if you need to override the auto-detected value
 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=
 
 # Appwrite Database IDs
@@ -117,6 +119,20 @@ DEBUG_MODE=false
 PORT=3000
 NODE_ENV=development
 ```
+
+**⚠️ Important: Register Android Platform in Appwrite Console**
+
+After setting up your environment variables, you **must** register your Android platform in the Appwrite console:
+
+1. Go to your Appwrite project dashboard: `https://cloud.appwrite.io/console`
+2. Navigate to **Settings** → **Platforms**
+3. Click **Add Platform** → Select **Android**
+4. Enter your Android package name: `com.yourcompany.fastfood` (from `app.json`)
+5. Click **Create**
+
+**Note:** The platform value is now automatically detected from your `app.json` file. If you see an error about "Invalid Origin", make sure:
+- The package name in `app.json` matches what's registered in Appwrite console
+- You've restarted your Expo development server after making changes
 
 **Running the Project**
 node backend/server.js
