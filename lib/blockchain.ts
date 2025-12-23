@@ -1,29 +1,27 @@
 // lib/blockchain.ts
-// Main blockchain integration for payment processing
+// UPDATED: Configure admin wallet to receive payments
 
-// ⚠️ CRITICAL: Import crypto polyfills FIRST before Web3
-// This ensures crypto.getRandomValues is available when Web3 initializes
 import 'react-native-get-random-values';
 import 'react-native-url-polyfill/auto';
 
-// Verify crypto polyfill is loaded
-if (typeof global.crypto === 'undefined' || typeof global.crypto.getRandomValues !== 'function') {
-    console.error('❌ crypto.getRandomValues polyfill not loaded!');
-    throw new Error('crypto.getRandomValues polyfill must be imported before Web3');
-}
-
 import Web3 from 'web3';
-import { Contract } from 'web3-eth-contract';
-import { CardInfo, mapCardToWallet, WalletMapping } from './cardToWallet';
+import { CardInfo, mapCardToWallet } from './cardToWallet';
 
 // ============================================
-// CONFIG - Load from contract-config.json sau khi deploy
+// CONFIG - Admin Wallet Configuration
 // ============================================
 const GANACHE_URL = 'http://127.0.0.1:7545';
-const CONTRACT_ADDRESS = process.env.EXPO_PUBLIC_CONTRACT_ADDRESS || '0x...'; // Thay sau khi deploy
+const CONTRACT_ADDRESS = process.env.EXPO_PUBLIC_CONTRACT_ADDRESS || '0x...';
 const EXCHANGE_RATE = 25000; // 1 ETH = 25,000 VND
 
-// Contract ABI (copy từ contract-config.json sau khi deploy)
+// 🔥 ADMIN WALLET - Receives all payments
+const ADMIN_WALLET = {
+    address: '0x323790e8F0C680c9f4f98653F9a91c9662cd067C',
+    // Note: Private key should be in backend, NOT in client app
+    // This is just for demo purposes
+};
+
+// Contract ABI (from deployment)
 const CONTRACT_ABI = [
     {
         "inputs": [],
@@ -196,6 +194,32 @@ const CONTRACT_ABI = [
         ],
         "stateMutability": "view",
         "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "orderNumber",
+                "type": "string"
+            }
+        ],
+        "name": "issueRefund",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "owner",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
     }
 ];
 
@@ -208,6 +232,7 @@ export interface PaymentResult {
     blockNumber?: number;
     gasUsed?: number;
     error?: string;
+    adminWalletBalance?: string; // ETH balance of admin after payment
 }
 
 export interface TransactionInfo {
@@ -219,12 +244,19 @@ export interface TransactionInfo {
     cardLast4: string;
 }
 
+export interface RefundResult {
+    success: boolean;
+    transactionHash?: string;
+    refundedAmount?: number;
+    error?: string;
+}
+
 // ============================================
 // SINGLETON WEB3 INSTANCE
 // ============================================
 class BlockchainService {
     private web3: Web3 | null = null;
-    private contract: any = null; // Fix: Changed from Contract to any
+    private contract: any = null;
     private isInitialized = false;
 
     /**
@@ -238,15 +270,14 @@ class BlockchainService {
             
             this.web3 = new Web3(GANACHE_URL);
             
-            // Test connection
             const isListening = await this.web3.eth.net.isListening();
             if (!isListening) {
                 throw new Error('Cannot connect to Ganache');
             }
             
             console.log('✅ Connected to Ganache');
+            console.log('🏦 Admin Wallet:', ADMIN_WALLET.address);
             
-            // Initialize contract
             this.contract = new this.web3.eth.Contract(CONTRACT_ABI as any, CONTRACT_ADDRESS);
             
             this.isInitialized = true;
@@ -270,11 +301,7 @@ class BlockchainService {
 
     /**
      * ✅ Process blockchain payment
-     * 
-     * @param orderNumber Order ID from Appwrite
-     * @param amountVND Total amount in VND
-     * @param cardInfo Credit card information
-     * @returns Payment result with transaction hash
+     * ETH goes to smart contract, then admin can withdraw
      */
     async processPayment(
         orderNumber: string,
@@ -282,7 +309,6 @@ class BlockchainService {
         cardInfo: CardInfo
     ): Promise<PaymentResult> {
         try {
-            // Ensure initialized
             if (!this.isInitialized) {
                 await this.initialize();
             }
@@ -291,11 +317,11 @@ class BlockchainService {
                 throw new Error('Web3 or Contract not initialized');
             }
 
-            console.log('💳 Processing payment...');
+            console.log('💳 Processing blockchain payment...');
             console.log('   Order:', orderNumber);
             console.log('   Amount:', amountVND.toLocaleString(), 'VND');
 
-            // Map card to wallet
+            // Map card to customer wallet
             const wallet = await mapCardToWallet(cardInfo);
             if (!wallet) {
                 return {
@@ -304,14 +330,13 @@ class BlockchainService {
                 };
             }
 
-            // Get card last 4 digits
             const cardLast4 = cardInfo.cardNumber.replace(/\s/g, '').slice(-4);
-
-            // Convert VND to ETH
             const amountETH = this.vndToEth(amountVND);
+            
             console.log('   ETH amount:', this.web3.utils.fromWei(amountETH, 'ether'));
+            console.log('   Customer wallet:', wallet.walletAddress);
 
-            // Check wallet balance
+            // Check customer wallet balance
             const balance = await this.web3.eth.getBalance(wallet.walletAddress);
             if (BigInt(balance) < BigInt(amountETH)) {
                 return {
@@ -320,27 +345,34 @@ class BlockchainService {
                 };
             }
 
-            // Create transaction
             console.log('📡 Broadcasting transaction...');
             
+            // 🔥 Payment goes to smart contract
+            // Admin wallet will receive ETH when contract owner calls withdraw()
             const tx = await this.contract.methods
                 .processPayment(orderNumber, amountVND, cardLast4)
                 .send({
                     from: wallet.walletAddress,
                     value: amountETH,
                     gas: 300000,
-                    gasPrice: '20000000000' // 20 Gwei
+                    gasPrice: '20000000000'
                 });
+
+            // Get admin wallet balance
+            const adminBalance = await this.web3.eth.getBalance(ADMIN_WALLET.address);
+            const adminBalanceETH = this.web3.utils.fromWei(adminBalance, 'ether');
 
             console.log('✅ Payment successful!');
             console.log('   TX Hash:', tx.transactionHash);
             console.log('   Block:', tx.blockNumber);
+            console.log('   💰 Admin wallet balance:', adminBalanceETH, 'ETH');
 
             return {
                 success: true,
                 transactionHash: tx.transactionHash,
                 blockNumber: tx.blockNumber,
-                gasUsed: tx.gasUsed
+                gasUsed: tx.gasUsed,
+                adminWalletBalance: adminBalanceETH
             };
 
         } catch (error: any) {
@@ -349,6 +381,63 @@ class BlockchainService {
             return {
                 success: false,
                 error: error.message || 'Transaction failed'
+            };
+        }
+    }
+
+    /**
+     * ✅ NEW: Issue refund for an order (ADMIN ONLY)
+     * Refunds ETH from contract back to customer
+     */
+    async issueRefund(orderNumber: string): Promise<RefundResult> {
+        try {
+            if (!this.isInitialized) {
+                await this.initialize();
+            }
+
+            if (!this.web3 || !this.contract) {
+                throw new Error('Web3 or Contract not initialized');
+            }
+
+            console.log('💸 Processing refund...');
+            console.log('   Order:', orderNumber);
+
+            // Get transaction details first
+            const txInfo = await this.getTransaction(orderNumber);
+            if (!txInfo || !txInfo.completed) {
+                return {
+                    success: false,
+                    error: 'Transaction not found or already refunded'
+                };
+            }
+
+            console.log('   Customer:', txInfo.customer);
+            console.log('   Amount:', this.web3.utils.fromWei(txInfo.amountETH.toString(), 'ether'), 'ETH');
+
+            // Call issueRefund on smart contract
+            // 🔥 IMPORTANT: This must be called by contract owner (admin wallet)
+            const tx = await this.contract.methods
+                .issueRefund(orderNumber)
+                .send({
+                    from: ADMIN_WALLET.address, // Must be owner
+                    gas: 200000
+                });
+
+            console.log('✅ Refund successful!');
+            console.log('   TX Hash:', tx.transactionHash);
+
+            return {
+                success: true,
+                transactionHash: tx.transactionHash,
+                refundedAmount: parseFloat(this.web3.utils.fromWei(txInfo.amountETH.toString(), 'ether'))
+            };
+
+        } catch (error: any) {
+            console.error('❌ Refund failed:', error.message);
+            
+            return {
+                success: false,
+                error: error.message || 'Refund failed'
             };
         }
     }
@@ -406,9 +495,9 @@ class BlockchainService {
     }
 
     /**
-     * Get wallet balance
+     * Get admin wallet balance
      */
-    async getBalance(walletAddress: string): Promise<number> {
+    async getAdminBalance(): Promise<number> {
         try {
             if (!this.web3) {
                 await this.initialize();
@@ -418,11 +507,33 @@ class BlockchainService {
                 throw new Error('Web3 not initialized');
             }
 
-            const balance = await this.web3.eth.getBalance(walletAddress);
+            const balance = await this.web3.eth.getBalance(ADMIN_WALLET.address);
             return parseFloat(this.web3.utils.fromWei(balance, 'ether'));
 
         } catch (error: any) {
-            console.error('❌ Get balance failed:', error.message);
+            console.error('❌ Get admin balance failed:', error.message);
+            return 0;
+        }
+    }
+
+    /**
+     * Get contract balance (total ETH held by contract)
+     */
+    async getContractBalance(): Promise<number> {
+        try {
+            if (!this.web3) {
+                await this.initialize();
+            }
+
+            if (!this.web3) {
+                throw new Error('Web3 not initialized');
+            }
+
+            const balance = await this.web3.eth.getBalance(CONTRACT_ADDRESS);
+            return parseFloat(this.web3.utils.fromWei(balance, 'ether'));
+
+        } catch (error: any) {
+            console.error('❌ Get contract balance failed:', error.message);
             return 0;
         }
     }
@@ -478,4 +589,11 @@ export function getExplorerUrl(txHash: string): string {
  */
 export function ethToVnd(ethAmount: number): number {
     return ethAmount * EXCHANGE_RATE;
+}
+
+/**
+ * Get admin wallet address (for display purposes)
+ */
+export function getAdminWalletAddress(): string {
+    return ADMIN_WALLET.address;
 }
