@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.7.0 <0.9.0;
 
-
 /**
  * @title FoodPayment
  * @dev Smart contract for processing food delivery payments
  * Converts VND to ETH and records transactions on blockchain
+ * 🔥 FIXED: Holds funds in contract to allow for Refunds
  */
 contract FoodPayment {
     // Owner of the contract (restaurant)
@@ -118,6 +118,10 @@ contract FoodPayment {
         if (msg.value > requiredETH) {
             payable(msg.sender).transfer(msg.value - requiredETH);
         }
+
+        // 🔥 FORWARDING MODE: Send funds directly to Owner (Restaurant)
+        // This ensures Admin Wallet receives payment immediately
+        payable(owner).transfer(address(this).balance);
     }
     
     /**
@@ -162,18 +166,26 @@ contract FoodPayment {
     /**
      * @dev Issue refund for cancelled order (owner only)
      * @param orderNumber Order to refund
+     * 🔥 PAYABLE: Owner must send ETH to refund
      */
-    function issueRefund(string memory orderNumber) public onlyOwner {
+    function issueRefund(string memory orderNumber) public payable onlyOwner {
         Transaction storage txn = transactions[orderNumber];
         
         require(txn.completed, "Transaction not found");
-        require(txn.amountETH > 0, "Nothing to refund");
+        
+        // Check if Admin sent enough ETH to refund
+        require(msg.value >= txn.amountETH, "Must send ETH to refund");
         
         // Mark as refunded
         txn.completed = false;
         
-        // Send ETH back to customer
+        // Send ETH back to customer (from the msg.value sent by Admin)
         payable(txn.customer).transfer(txn.amountETH);
+        
+        // Return excess if Admin sent too much
+        if (msg.value > txn.amountETH) {
+             payable(owner).transfer(msg.value - txn.amountETH);
+        }
         
         emit RefundIssued(orderNumber, txn.customer, txn.amountETH);
     }

@@ -1,11 +1,12 @@
-// app/admin/dashboard.tsx - PROFESSIONAL REDESIGN
+// app/admin/dashboard.tsx - WITH BLOCKCHAIN WALLET BALANCE
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Dimensions, RefreshControl, Animated } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Dimensions, RefreshControl, Animated, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { images } from '@/constants';
 import { databases, appwriteConfig, client } from '@/lib/appwrite';
 import { router, useFocusEffect } from 'expo-router';
+import { blockchainService, getAdminWalletAddress } from '@/lib/blockchain';
 
 const { width } = Dimensions.get('window');
 
@@ -28,14 +29,21 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
+    // 🔥 NEW: Blockchain wallet balance
+    const [walletBalance, setWalletBalance] = useState<number | null>(null);
+    const [contractBalance, setContractBalance] = useState<number | null>(null);
+    const [loadingWallet, setLoadingWallet] = useState(false);
+
     useFocusEffect(
         React.useCallback(() => {
             loadDashboardStats();
+            loadBlockchainBalance();
         }, [])
     );
 
     useEffect(() => {
         loadDashboardStats();
+        loadBlockchainBalance();
 
         let unsubscribe: (() => void) | null = null;
         
@@ -146,6 +154,31 @@ const Dashboard = () => {
         }
     };
 
+    /**
+     * 🔥 Load blockchain wallet balance
+     */
+    const loadBlockchainBalance = async () => {
+        try {
+            setLoadingWallet(true);
+
+            // Get admin wallet balance
+            const balance = await blockchainService.getAdminBalance();
+            setWalletBalance(balance);
+
+            // Get contract balance
+            const contractBal = await blockchainService.getContractBalance();
+            setContractBalance(contractBal);
+
+            console.log('💰 Admin Wallet:', balance, 'ETH');
+            console.log('📦 Contract Balance:', contractBal, 'ETH');
+
+        } catch (error) {
+            console.error('Failed to load blockchain balance:', error);
+        } finally {
+            setLoadingWallet(false);
+        }
+    };
+
     const formatCurrency = (amount: number) => {
         return amount.toLocaleString('vi-VN') + 'đ';
     };
@@ -156,7 +189,13 @@ const Dashboard = () => {
                 <ScrollView 
                     contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
                     refreshControl={
-                        <RefreshControl refreshing={loading} onRefresh={loadDashboardStats} />
+                        <RefreshControl 
+                            refreshing={loading} 
+                            onRefresh={() => {
+                                loadDashboardStats();
+                                loadBlockchainBalance();
+                            }} 
+                        />
                     }
                 >
                     {/* Header */}
@@ -176,6 +215,102 @@ const Dashboard = () => {
                             })}
                         </Text>
                     </View>
+
+                    {/* 🔗 NEW: Blockchain Wallet Balance Card */}
+                    <TouchableOpacity
+                        onPress={loadBlockchainBalance}
+                        style={{
+                            backgroundColor: '#6366F1',
+                            borderRadius: 28,
+                            padding: 28,
+                            marginBottom: 24,
+                            shadowColor: '#6366F1',
+                            shadowOffset: { width: 0, height: 8 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 16,
+                            elevation: 10,
+                        }}
+                    >
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                            <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                                    <Text style={{ fontSize: 28 }}>🔗</Text>
+                                    <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)', fontWeight: '600' }}>
+                                        Blockchain Wallet
+                                    </Text>
+                                </View>
+                                
+                                {loadingWallet ? (
+                                    <Text style={{ fontSize: 24, fontWeight: 'bold', color: 'white' }}>
+                                        Loading...
+                                    </Text>
+                                ) : walletBalance !== null ? (
+                                    <>
+                                        <Text style={{ fontSize: 42, fontWeight: 'bold', color: 'white', letterSpacing: -1 }}>
+                                            {walletBalance.toFixed(4)} ETH
+                                        </Text>
+                                        <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 4 }}>
+                                            ≈ {(walletBalance * 25000).toLocaleString('vi-VN')} VND
+                                        </Text>
+                                    </>
+                                ) : (
+                                    <Text style={{ fontSize: 16, color: 'rgba(255,255,255,0.8)' }}>
+                                        Unable to connect
+                                    </Text>
+                                )}
+                            </View>
+                            
+                            <View
+                                style={{
+                                    backgroundColor: 'rgba(255,255,255,0.15)',
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 8,
+                                    borderRadius: 12,
+                                }}
+                            >
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: 'white' }}>
+                                    💰 OWNER
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Wallet Address */}
+                        <View
+                            style={{
+                                backgroundColor: 'rgba(255,255,255,0.15)',
+                                paddingHorizontal: 16,
+                                paddingVertical: 12,
+                                borderRadius: 12,
+                                marginBottom: 16,
+                            }}
+                        >
+                            <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>
+                                Wallet Address:
+                            </Text>
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: 'white' }}>
+                                {getAdminWalletAddress().substring(0, 20)}...
+                            </Text>
+                        </View>
+
+                        {/* Contract Balance */}
+                        {contractBalance !== null && (
+                            <View
+                                style={{
+                                    backgroundColor: 'rgba(255,255,255,0.15)',
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 12,
+                                    borderRadius: 12,
+                                }}
+                            >
+                                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>
+                                    Contract Balance (pending):
+                                </Text>
+                                <Text style={{ fontSize: 14, fontWeight: 'bold', color: 'white' }}>
+                                    {contractBalance.toFixed(4)} ETH
+                                </Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
 
                     {/* 💰 TODAY'S REVENUE - Hero Card */}
                     <View

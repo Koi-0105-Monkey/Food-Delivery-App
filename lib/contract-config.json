@@ -1,6 +1,6 @@
 {
-  "contractAddress": "0x9688b3187fb94d32e123083B2Ae4438D6B2Af2E3",
-  "deployer": "0xA4b2a71b57f1E8022F40A0f903e3B3E0f9752Dd7",
+  "contractAddress": "0x1C616d102B7E8F5a1240801Ab5B46c3E406f57E2",
+  "deployer": "0x323790e8F0C680c9f4f98653F9a91c9662cd067C",
   "network": "http://localhost:7545",
   "abi": [
     {
@@ -69,31 +69,6 @@
       "inputs": [
         {
           "indexed": true,
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "string",
-          "name": "orderNumber",
-          "type": "string"
-        }
-      ],
-      "name": "PaymentTransferred",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
           "internalType": "string",
           "name": "orderNumber",
           "type": "string"
@@ -131,13 +106,6 @@
         }
       ],
       "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "emergencyWithdraw",
-      "outputs": [],
-      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -279,7 +247,7 @@
       "name": "owner",
       "outputs": [
         {
-          "internalType": "address payable",
+          "internalType": "address",
           "name": "",
           "type": "address"
         }
@@ -362,19 +330,6 @@
     {
       "inputs": [
         {
-          "internalType": "address payable",
-          "name": "newOwner",
-          "type": "address"
-        }
-      ],
-      "name": "transferOwnership",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
           "internalType": "uint256",
           "name": "newRate",
           "type": "uint256"
@@ -403,8 +358,15 @@
       ],
       "stateMutability": "view",
       "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "withdraw",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
     }
   ],
-  "deployedAt": "2025-12-23T04:50:56.933Z",
+  "deployedAt": "2025-12-23T13:37:03.535Z",
   "exchangeRate": 25000
 }
