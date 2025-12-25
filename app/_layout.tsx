@@ -31,7 +31,7 @@ Sentry.init({
 });
 
 function RootLayoutComponent() {
-  const { isLoading, fetchAuthenticatedUser, user, isAdmin, setUser } = useAuthStore();
+  const { isLoading, fetchAuthenticatedUser, user, isAdmin, setUser, setIsAuthenticated } = useAuthStore();
   const { loadCartFromServer } = useCartStore();
   const router = useRouter();
   const segments = useSegments();
@@ -110,20 +110,40 @@ function RootLayoutComponent() {
     };
   }, [user?.$id]);
 
-  // ✅ DOUBLE CHECK ON NAVIGATION
+  // ✅ CHECK BAN ON TAB SWITCH (Home, Search, Cart, Settings)
   const pathname = useSegments();
   useEffect(() => {
-    if (user) {
-      if (user.banExpiresAt && new Date(user.banExpiresAt) > new Date()) {
-        setIsBanned(true);
-      }
+    if (!user?.$id) return;
+
+    // Check ban status whenever user navigates to a new tab
+    if (user.banExpiresAt && new Date(user.banExpiresAt) > new Date()) {
+      const banDate = new Date(user.banExpiresAt);
+      const isPermanent = banDate.getFullYear() > 3000;
+      const msg = isPermanent
+        ? 'Your account has been permanently banned.'
+        : `Your account is banned until ${banDate.toLocaleDateString()} ${banDate.toLocaleTimeString()}.`;
+
+      console.log('🚫 Ban detected on navigation!');
+      setBanMessage(msg);
+      setIsBanned(true);
     }
-  }, [pathname, user]);
+  }, [pathname, user?.$id, user?.banExpiresAt]); // Re-check when pathname or ban status changes
 
   const handleLogout = async () => {
-    await signOut();
+    try {
+      await signOut();
+    } catch (error) {
+      // Ignore errors (e.g., guest user, missing scopes)
+      console.log('Logout error ignored:', error);
+    }
+
+    // Always clear local state regardless of server response
+    setIsAuthenticated(false);
     setUser(null);
     setIsBanned(false);
+    setBanMessage('');
+
+    // Force redirect to login
     router.replace('/(auth)/sign-in');
   };
 

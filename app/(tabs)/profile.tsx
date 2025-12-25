@@ -30,13 +30,13 @@ const ProfileField = ({ label, value, icon }: { label: string; value: string; ic
 const Profile = () => {
     const { user, setIsAuthenticated, setUser, isAdmin } = useAuthStore();
     const { defaultAddress, getDisplayAddress, fetchAddresses } = useAddressStore();
-    
+
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [showAddressListModal, setShowAddressListModal] = useState(false);
     const [showAddEditModal, setShowAddEditModal] = useState(false);
     const [editingAddress, setEditingAddress] = useState<Address | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
-    
+
     // Order History State
     const [hasPendingOrders, setHasPendingOrders] = useState(false);
     const [hasCompletedOrders, setHasCompletedOrders] = useState(false);
@@ -66,22 +66,22 @@ const Profile = () => {
 
     const checkOrdersCount = async () => {
         if (!user) return;
-        
+
         try {
             const userOrders = await getUserOrders(user.$id);
-            
-            const pending = userOrders.filter(order => 
-                order.payment_status === 'pending' || 
+
+            const pending = userOrders.filter(order =>
+                order.payment_status === 'pending' ||
                 order.payment_status === 'failed'
             );
-            
-            const completed = userOrders.filter(order => 
+
+            const completed = userOrders.filter(order =>
                 order.payment_status === 'paid'
             );
-            
+
             setHasPendingOrders(pending.length > 0);
             setHasCompletedOrders(completed.length > 0);
-            
+
             if (isInitialLoad) {
                 console.log(`✅ Loaded ${pending.length} pending, ${completed.length} completed orders`);
                 setIsInitialLoad(false);
@@ -107,13 +107,15 @@ const Profile = () => {
                         setIsLoggingOut(true);
                         try {
                             await account.deleteSession('current');
+                        } catch (error: any) {
+                            // Ignore errors (e.g., guest user, missing scopes)
+                            console.log('Logout error ignored:', error);
+                        } finally {
+                            // Always clear local state and redirect
                             setIsAuthenticated(false);
                             setUser(null);
-                            router.replace('/sign-in');
-                        } catch (error: any) {
-                            Alert.alert('Error', error.message || 'Failed to logout');
-                        } finally {
                             setIsLoggingOut(false);
+                            router.replace('/sign-in');
                         }
                     },
                 },
@@ -182,7 +184,7 @@ const Profile = () => {
                             className="size-full rounded-full"
                             resizeMode="cover"
                         />
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             className="profile-edit"
                             onPress={() => setShowEditModal(true)}
                         >
@@ -302,7 +304,7 @@ const Profile = () => {
                     {(hasPendingOrders || hasCompletedOrders) && (
                         <View className="mt-4">
                             <Text className="base-bold text-dark-100 mb-4">📦 Order History</Text>
-                            
+
                             {hasPendingOrders && (
                                 <TouchableOpacity
                                     className="bg-white border border-gray-200 rounded-2xl p-5 flex-row items-center justify-between mb-3"
