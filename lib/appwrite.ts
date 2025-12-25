@@ -7,12 +7,12 @@ import { Platform } from 'react-native';
 const getPlatform = (): string => {
     let detectedPlatform: string | null = null;
     let source = '';
-    
+
     // Priority 1: Auto-detect from Expo Constants (Android package or iOS bundle identifier)
     // This takes precedence because app.json is the source of truth
     const androidPackage = Constants.expoConfig?.android?.package;
     const iosBundleId = Constants.expoConfig?.ios?.bundleIdentifier;
-    
+
     if (Platform.OS === 'android' && androidPackage) {
         detectedPlatform = androidPackage;
         source = 'app.json android.package';
@@ -20,46 +20,46 @@ const getPlatform = (): string => {
         detectedPlatform = iosBundleId;
         source = 'app.json ios.bundleIdentifier';
     }
-    
+
     // Priority 2: Try to get from manifest (for runtime)
     if (!detectedPlatform) {
         const manifest = (Constants as any)?.manifest || (Constants as any)?.manifest2;
-        const manifestPackage = manifest?.android?.package || 
-                               manifest?.extra?.expoClient?.android?.package;
-        
+        const manifestPackage = manifest?.android?.package ||
+            manifest?.extra?.expoClient?.android?.package;
+
         if (manifestPackage) {
             detectedPlatform = manifestPackage;
             source = 'Expo manifest';
         }
     }
-    
+
     // Priority 3: Use environment variable as fallback (only if app.json not found)
     if (!detectedPlatform && process.env.EXPO_PUBLIC_APPWRITE_PLATFORM) {
         detectedPlatform = process.env.EXPO_PUBLIC_APPWRITE_PLATFORM;
         source = 'EXPO_PUBLIC_APPWRITE_PLATFORM env variable (fallback)';
     }
-    
+
     // Priority 4: Try Constants.executionEnvironment (last resort)
     if (!detectedPlatform && Platform.OS === 'android') {
         const executionEnv = (Constants as any)?.executionEnvironment;
         // Sometimes package info is in different places
-        const altPackage = (Constants as any)?.appOwnership === 'expo' 
-            ? (Constants as any)?.manifest?.slug 
+        const altPackage = (Constants as any)?.appOwnership === 'expo'
+            ? (Constants as any)?.manifest?.slug
             : null;
-        
+
         if (altPackage && typeof altPackage === 'string' && altPackage.includes('.')) {
             detectedPlatform = altPackage;
             source = 'Constants alternative';
         }
     }
-    
+
     if (!detectedPlatform) {
         throw new Error(
             'Appwrite platform not configured. Please set EXPO_PUBLIC_APPWRITE_PLATFORM in your .env file ' +
             'or ensure your app.json has the correct Android package/iOS bundle identifier.'
         );
     }
-    
+
     // Log for debugging
     if (__DEV__) {
         console.log(`🔧 Appwrite Platform Detection:`);
@@ -68,7 +68,7 @@ const getPlatform = (): string => {
         console.log(`   OS: ${Platform.OS}`);
         console.log(`   Env var: ${process.env.EXPO_PUBLIC_APPWRITE_PLATFORM || 'not set'}`);
     }
-    
+
     return detectedPlatform;
 };
 
@@ -112,7 +112,7 @@ export const databases = new Databases(client);
 export const storage = new Storage(client);
 const avatars = new Avatars(client);
 
-const waitForSession = (ms: number = 500) => 
+const waitForSession = (ms: number = 500) =>
     new Promise(resolve => setTimeout(resolve, ms));
 
 // ========== AUTH FUNCTIONS ==========
@@ -231,6 +231,25 @@ export const signIn = async ({ email, password }: SignInParams) => {
     }
 };
 
+export const signOut = async () => {
+    try {
+        const session = await account.getSession('current');
+        if (session) {
+            await account.deleteSession('current');
+            console.log('✅ Signed out successfully');
+        }
+        return true;
+    } catch (error: any) {
+        // Ignore "missing scopes" or "401" errors as it means we are already logged out
+        if (error?.code === 401 || error?.message?.includes('missing scopes')) {
+            console.log('ℹ️ Already signed out or guest session');
+            return true;
+        }
+        console.error('❌ Sign out error:', error);
+        return false;
+    }
+};
+
 export const getCurrentUser = async () => {
     try {
         const currentAccount = await account.get();
@@ -253,7 +272,7 @@ export const getCurrentUser = async () => {
         }
 
         const userData = currentUser.documents[0] as User;
-        
+
         console.log('✅ User document found:', userData.email);
         console.log('🔐 User role:', userData.role || 'user');
 
@@ -262,7 +281,7 @@ export const getCurrentUser = async () => {
         if (error.code === 401 || error.message?.includes('guests')) {
             return null;
         }
-        
+
         if (error.message && !error.message.includes('session')) {
             console.error('❌ Get current user error:', error.message);
         }
@@ -425,11 +444,11 @@ export const clearCartFromServerLegacy = async (userId: string) => {
 };
 
 // ========== USER PROFILE FUNCTIONS ==========
-export const updateUserProfile = async ({ 
+export const updateUserProfile = async ({
     userId,
-    name, 
-    phone, 
-    avatarUri 
+    name,
+    phone,
+    avatarUri
 }: {
     userId: string;
     name: string;
@@ -443,13 +462,13 @@ export const updateUserProfile = async ({
         // 🔥 FIX: If avatar is local file (from image picker), upload to storage
         if (avatarUri.startsWith('file://')) {
             console.log('📤 Uploading new avatar...');
-            
+
             const response = await fetch(avatarUri);
             const blob = await response.blob();
-            
+
             // Create unique file ID
             const fileId = ID.unique();
-            
+
             // Upload file using InputFile
             const file = await storage.createFile(
                 appwriteConfig.bucketId,
@@ -667,7 +686,7 @@ export const saveUserAddress = async (userId: string, address: {
         // Nếu là địa chỉ đầu tiên hoặc set là default, unset các địa chỉ default khác
         if (address.isDefault) {
             const existingAddresses = await getUserAddresses(userId);
-            
+
             // Unset all existing defaults
             for (const addr of existingAddresses) {
                 if (addr.is_default) {
@@ -695,7 +714,7 @@ export const saveUserAddress = async (userId: string, address: {
                 is_default: address.isDefault ?? false,
             }
         );
-        
+
         return doc;
     } catch (error: any) {
         console.error('❌ Save address error:', error);
@@ -714,7 +733,7 @@ export const updateUserAddress = async (addressId: string, address: {
 }) => {
     try {
         const updateData: any = {};
-        
+
         if (address.street !== undefined) updateData.street = address.street;
         if (address.city !== undefined) updateData.city = address.city;
         if (address.country !== undefined) updateData.country = address.country;
@@ -726,7 +745,7 @@ export const updateUserAddress = async (addressId: string, address: {
             addressId,
             updateData
         );
-        
+
         return doc;
     } catch (error: any) {
         console.error('❌ Update address error:', error);
@@ -744,7 +763,7 @@ export const deleteUserAddress = async (addressId: string) => {
             appwriteConfig.userAddressesCollectionId,
             addressId
         );
-        
+
         console.log('✅ Address deleted');
     } catch (error: any) {
         console.error('❌ Delete address error:', error);
@@ -759,7 +778,7 @@ export const setDefaultAddress = async (userId: string, addressId: string) => {
     try {
         // Unset all existing defaults
         const existingAddresses = await getUserAddresses(userId);
-        
+
         for (const addr of existingAddresses) {
             if (addr.is_default && addr.$id !== addressId) {
                 await databases.updateDocument(
@@ -778,7 +797,7 @@ export const setDefaultAddress = async (userId: string, addressId: string) => {
             addressId,
             { is_default: true }
         );
-        
+
         console.log('✅ Default address set');
     } catch (error: any) {
         console.error('❌ Set default address error:', error);

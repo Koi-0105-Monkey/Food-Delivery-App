@@ -25,6 +25,7 @@ export interface User extends Models.Document {
     avatar: string;
     phone: string;
     role: 'user' | 'admin';
+    banExpiresAt?: string;
 }
 
 export interface Address {
@@ -159,25 +160,25 @@ export interface Order extends Models.Document {
     user: string;
     order_number: string;
     items: string; // JSON string of OrderItem[]
-    
+
     // Pricing
     subtotal: number;
     delivery_fee: number;
     discount: number;
     total: number;
-    
+
     // Delivery Info
     delivery_address: string;
     delivery_phone: string;
     delivery_notes?: string;
-    
+
     // Payment
     payment_method: PaymentMethod;
     payment_status: PaymentStatus;
     transaction_id?: string;
     qr_code_url?: string;
     paid_at?: string;
-    
+
     // Order Status
     order_status: OrderStatus;
 }

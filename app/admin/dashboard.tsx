@@ -7,6 +7,7 @@ import { images } from '@/constants';
 import { databases, appwriteConfig, client } from '@/lib/appwrite';
 import { router, useFocusEffect } from 'expo-router';
 import { blockchainService, getAdminWalletAddress } from '@/lib/blockchain';
+import { Query } from 'react-native-appwrite';
 
 const { width } = Dimensions.get('window');
 
@@ -16,12 +17,12 @@ const Dashboard = () => {
         todayRevenue: 0,
         todayOrders: 0,
         todayGrowth: 0,
-        
+
         // Quick stats
         pendingOrders: 0,
         completedOrders: 0,
         totalCustomers: 0,
-        
+
         // Comparison data
         yesterdayRevenue: 0,
         lastWeekRevenue: 0,
@@ -46,7 +47,7 @@ const Dashboard = () => {
         loadBlockchainBalance();
 
         let unsubscribe: (() => void) | null = null;
-        
+
         try {
             unsubscribe = client.subscribe(
                 `databases.${appwriteConfig.databaseId}.collections.${appwriteConfig.ordersCollectionId}.documents`,
@@ -77,40 +78,72 @@ const Dashboard = () => {
         }).start();
     }, []);
 
+
+
     const loadDashboardStats = async () => {
         try {
             setLoading(true);
 
-            const allOrders = await databases.listDocuments(
-                appwriteConfig.databaseId,
-                appwriteConfig.ordersCollectionId
+            // ✅ FIX: Fetch ALL orders with pagination to ensure accurate stats
+            let allDocuments: any[] = [];
+            let offset = 0;
+            const limit = 100;
+            let hasMore = true;
+
+            while (hasMore) {
+                const results = await databases.listDocuments(
+                    appwriteConfig.databaseId,
+                    appwriteConfig.ordersCollectionId,
+                    [
+                        Query.limit(limit),
+                        Query.offset(offset),
+                        Query.orderDesc('$createdAt')
+                    ]
+                );
+
+                allDocuments = [...allDocuments, ...results.documents];
+
+                if (results.documents.length < limit) {
+                    hasMore = false;
+                } else {
+                    offset += limit;
+                }
+            }
+
+            // ✅ Logic Updated: include confirmed COD orders (matching Analytics)
+            const validOrders = allDocuments.filter(
+                (order: any) => {
+                    const isPaid = order.payment_status === 'paid' && order.order_status !== 'cancelled';
+
+                    const isConfirmedProcessing =
+                        (order.payment_method === 'cod' || order.payment_method === 'bidv' || !order.payment_status || order.payment_status === 'pending') &&
+                        (order.order_status === 'confirmed' || order.order_status === 'preparing' || order.order_status === 'delivering' || order.order_status === 'completed');
+
+                    return isPaid || isConfirmedProcessing;
+                }
             );
 
             const now = new Date();
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             const yesterday = new Date(today);
             yesterday.setDate(yesterday.getDate() - 1);
-            
+
             const weekAgo = new Date(today);
             weekAgo.setDate(weekAgo.getDate() - 7);
 
-            // Today's paid orders
-            const todayPaidOrders = allOrders.documents.filter((order: any) => 
-                order.payment_status === 'paid' && 
+            // Today's valid orders
+            const todayPaidOrders = validOrders.filter((order: any) =>
                 new Date(order.$createdAt) >= today
             );
 
-            // Yesterday's paid orders
-            const yesterdayPaidOrders = allOrders.documents.filter((order: any) => {
+            // Yesterday's valid orders
+            const yesterdayPaidOrders = validOrders.filter((order: any) => {
                 const date = new Date(order.$createdAt);
-                return order.payment_status === 'paid' && 
-                       date >= yesterday && 
-                       date < today;
+                return date >= yesterday && date < today;
             });
 
-            // Last week's paid orders
-            const lastWeekPaidOrders = allOrders.documents.filter((order: any) => 
-                order.payment_status === 'paid' && 
+            // Last week's valid orders
+            const lastWeekPaidOrders = validOrders.filter((order: any) =>
                 new Date(order.$createdAt) >= weekAgo
             );
 
@@ -118,8 +151,8 @@ const Dashboard = () => {
             const yesterdayRevenue = yesterdayPaidOrders.reduce((sum: number, order: any) => sum + order.total, 0);
             const lastWeekRevenue = lastWeekPaidOrders.reduce((sum: number, order: any) => sum + order.total, 0);
 
-            const todayGrowth = yesterdayRevenue > 0 
-                ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100 
+            const todayGrowth = yesterdayRevenue > 0
+                ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100
                 : (todayRevenue > 0 ? 100 : 0);
 
             // Get customers
@@ -128,12 +161,14 @@ const Dashboard = () => {
                 appwriteConfig.userCollectionId
             );
 
-            const pendingOrders = allOrders.documents.filter(
+            // Count pending orders from ALL documents
+            const pendingOrders = allDocuments.filter(
                 (order: any) => order.order_status === 'pending'
             ).length;
 
-            const completedOrders = allOrders.documents.filter(
-                (order: any) => order.order_status === 'confirmed'
+            // Count completed orders from ALL documents
+            const completedOrders = allDocuments.filter(
+                (order: any) => order.order_status === 'confirmed' || order.order_status === 'completed'
             ).length;
 
             setStats({
@@ -186,15 +221,15 @@ const Dashboard = () => {
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
             <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-                <ScrollView 
+                <ScrollView
                     contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
                     refreshControl={
-                        <RefreshControl 
-                            refreshing={loading} 
+                        <RefreshControl
+                            refreshing={loading}
                             onRefresh={() => {
                                 loadDashboardStats();
                                 loadBlockchainBalance();
-                            }} 
+                            }}
                         />
                     }
                 >
@@ -207,11 +242,11 @@ const Dashboard = () => {
                             Today's Overview
                         </Text>
                         <Text style={{ fontSize: 14, color: '#8B8B8B', marginTop: 4 }}>
-                            {new Date().toLocaleDateString('en-US', { 
-                                weekday: 'long', 
-                                year: 'numeric', 
-                                month: 'long', 
-                                day: 'numeric' 
+                            {new Date().toLocaleDateString('en-US', {
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
                             })}
                         </Text>
                     </View>
@@ -239,7 +274,7 @@ const Dashboard = () => {
                                         Blockchain Wallet
                                     </Text>
                                 </View>
-                                
+
                                 {loadingWallet ? (
                                     <Text style={{ fontSize: 24, fontWeight: 'bold', color: 'white' }}>
                                         Loading...
@@ -259,7 +294,7 @@ const Dashboard = () => {
                                     </Text>
                                 )}
                             </View>
-                            
+
                             <View
                                 style={{
                                     backgroundColor: 'rgba(255,255,255,0.15)',
@@ -335,7 +370,7 @@ const Dashboard = () => {
                                     {formatCurrency(stats.todayRevenue)}
                                 </Text>
                             </View>
-                            
+
                             <View
                                 style={{
                                     backgroundColor: stats.todayGrowth >= 0 ? 'rgba(255,255,255,0.25)' : 'rgba(241,65,65,0.25)',
@@ -412,7 +447,7 @@ const Dashboard = () => {
                         <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1A1A1A', marginBottom: 16 }}>
                             Quick Stats
                         </Text>
-                        
+
                         <View style={{ flexDirection: 'row', gap: 12 }}>
                             {/* Pending Orders */}
                             <View
@@ -536,7 +571,7 @@ const Dashboard = () => {
                         <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1A1A1A', marginBottom: 16 }}>
                             Quick Actions
                         </Text>
-                        
+
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
                             <TouchableOpacity
                                 onPress={() => router.push('/admin/orders')}
