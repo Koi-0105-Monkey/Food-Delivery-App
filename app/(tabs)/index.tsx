@@ -29,13 +29,13 @@ const SLIDER_WIDTH = SCREEN_WIDTH - 40;
 // ✅ FIX 5: Cache best sellers
 let bestSellersCache: MenuItem[] = [];
 let bestSellersCacheTime = 0;
-const BEST_SELLERS_CACHE_DURATION = 300000; // 5 minutes
+const BEST_SELLERS_CACHE_DURATION = 10000; // 10 seconds for testing
 
 export default function Index() {
     const { user } = useAuthStore();
     const { getDisplayAddress, fetchAddresses } = useAddressStore();
     const params = useLocalSearchParams<{ showWelcome?: string }>();
-    
+
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showAddressListModal, setShowAddressListModal] = useState(false);
     const [showAddEditModal, setShowAddEditModal] = useState(false);
@@ -109,7 +109,7 @@ export default function Index() {
         }
     };
 
-    // ✅ FIX 7: Load best sellers with cache
+    // ✅ FIX 7: Load best sellers from ACTUAL ORDERS
     useEffect(() => {
         loadBestSellers();
     }, []);
@@ -127,26 +127,95 @@ export default function Index() {
         try {
             setLoadingBestSellers(true);
 
-            // ✅ Simplified query - chỉ lấy 4 items với rating cao nhất
-            const allMenu = await databases.listDocuments(
+            // 1. Fetch recent orders to determine popularity (Last 100 orders)
+            // This is "heavy" but necessary without a dedicated "sold_count" field in DB.
+            const recentOrders = await databases.listDocuments(
                 appwriteConfig.databaseId,
-                appwriteConfig.menuCollectionId,
+                appwriteConfig.ordersCollectionId,
                 [
-                    Query.limit(4), 
-                    Query.orderDesc('rating')
+                    Query.limit(100),
+                    Query.orderDesc('$createdAt'),
+                    Query.select(['items']) // Optimization: Only fetch items field
                 ]
             );
 
-            const items = allMenu.documents as MenuItem[];
-            
+            // 2. Count item sales
+            const itemSales: { [key: string]: number } = {};
+            recentOrders.documents.forEach((order: any) => {
+                try {
+                    const items = JSON.parse(order.items || '[]');
+                    items.forEach((item: any) => {
+                        const id = item.menu_id || item.id;
+                        itemSales[id] = (itemSales[id] || 0) + (item.quantity || 1);
+                    });
+                } catch (e) {
+                    // Ignore parse errors
+                }
+            });
+
+            // 3. Get Top 4 IDs
+            const topIds = Object.entries(itemSales)
+                .sort(([, a], [, b]) => b - a) // Sort desc by count
+                .slice(0, 4)
+                .map(([id]) => id);
+
+            if (topIds.length === 0) {
+                // Fallback to rating if no orders
+                const ratedMenu = await databases.listDocuments(
+                    appwriteConfig.databaseId,
+                    appwriteConfig.menuCollectionId,
+                    [Query.limit(4), Query.orderDesc('rating')]
+                );
+                setBestSellers(ratedMenu.documents as MenuItem[]);
+                return;
+            }
+
+            // 4. Fetch details for these 4 items
+            // We use Promise.all to fetch them in parallel or use a query with "equal" if IDs supported (array contains not supported for ID in appwrite easily)
+            // Simpler: Fetch one by one or fetch all and filter (fetch all is bad).
+            // Appwrite doesn't support "id in [a,b,c]" easily. We'll fetch individually.
+            const itemPromises = topIds.map(id =>
+                databases.getDocument(
+                    appwriteConfig.databaseId,
+                    appwriteConfig.menuCollectionId,
+                    id
+                ).catch(() => null) // Handle deleted items
+            );
+
+            const fetchedItems = await Promise.all(itemPromises);
+            const validItems = fetchedItems.filter(item => item !== null) as MenuItem[];
+
+            // 5. If less than 4 (due to errors/deleted), fill with top rated
+            if (validItems.length < 4) {
+                const existingIds = validItems.map(i => i.$id);
+                const filler = await databases.listDocuments(
+                    appwriteConfig.databaseId,
+                    appwriteConfig.menuCollectionId,
+                    [Query.limit(4 - validItems.length), Query.orderDesc('rating')]
+                );
+                // Avoid duplicates
+                filler.documents.forEach((doc: any) => {
+                    if (!existingIds.includes(doc.$id)) validItems.push(doc as MenuItem);
+                });
+            }
+
             // Save to cache
-            bestSellersCache = items;
+            bestSellersCache = validItems.slice(0, 4);
             bestSellersCacheTime = Date.now();
-            
-            setBestSellers(items);
-            console.log(`✅ Loaded ${items.length} best sellers`);
+
+            setBestSellers(bestSellersCache);
+            console.log(`✅ Loaded ${bestSellersCache.length} best sellers from orders`);
         } catch (error) {
             console.error('Failed to load best sellers:', error);
+            // Fallback
+            try {
+                const ratedMenu = await databases.listDocuments(
+                    appwriteConfig.databaseId,
+                    appwriteConfig.menuCollectionId,
+                    [Query.limit(4), Query.orderDesc('rating')]
+                );
+                setBestSellers(ratedMenu.documents as MenuItem[]);
+            } catch (e) { }
         } finally {
             setLoadingBestSellers(false);
         }
@@ -188,7 +257,7 @@ export default function Index() {
 
     return (
         <SafeAreaView className="flex-1 bg-white">
-            <ScrollView 
+            <ScrollView
                 contentContainerStyle={{ paddingBottom: 120 }}
                 showsVerticalScrollIndicator={false}
             >

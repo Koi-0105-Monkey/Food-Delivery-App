@@ -3,7 +3,7 @@ import { Link, router } from 'expo-router';
 import CustomInput from '@/components/CustomInput';
 import CustomButton from '@/components/CustomButton';
 import { useState } from 'react';
-import { signIn } from '@/lib/appwrite';
+import { signIn, signOut } from '@/lib/appwrite';
 import useAuthStore from '@/store/auth.store';
 import * as Sentry from '@sentry/react-native';
 
@@ -28,22 +28,39 @@ const SignIn = () => {
 
         try {
             console.log('🔐 Starting sign in...');
-            
-            await signIn({ 
-                email: email.trim().toLowerCase(), 
-                password 
+
+            await signIn({
+                email: email.trim().toLowerCase(),
+                password
             });
 
             console.log('✅ Sign in successful, fetching user...');
 
             // Fetch user data (includes role)
             await fetchAuthenticatedUser();
-            
+
             // Get user from store to check role
             const { user, isAdmin } = useAuthStore.getState();
 
             console.log('✅ User fetched:', user?.email);
             console.log('🔐 Role:', user?.role);
+
+            // 🚫 CHECK BAN STATUS
+            if (user?.banExpiresAt && new Date(user.banExpiresAt) > new Date()) {
+                const banDate = new Date(user.banExpiresAt);
+                const isPermanent = banDate.getFullYear() > 3000;
+
+                await signOut();
+                useAuthStore.getState().setUser(null);
+
+                Alert.alert(
+                    'Account Banned',
+                    isPermanent
+                        ? 'Your account has been permanently banned from accessing this application.'
+                        : `Your account is banned until ${banDate.toLocaleDateString()} ${banDate.toLocaleTimeString()}.`
+                );
+                return;
+            }
 
             // ✅ Role-based redirect
             if (isAdmin) {
@@ -56,9 +73,9 @@ const SignIn = () => {
 
         } catch (error: any) {
             console.error('❌ Sign in error:', error);
-            
+
             let errorMessage = 'Failed to sign in. Please check your credentials.';
-            
+
             if (error.message?.includes('Invalid email or password')) {
                 errorMessage = 'Invalid email or password. Please try again.';
             } else if (error.message?.includes('No account found')) {
@@ -66,7 +83,7 @@ const SignIn = () => {
             } else if (error.message?.includes('blocked')) {
                 errorMessage = 'Your account has been blocked. Please contact support.';
             }
-            
+
             Alert.alert('Sign In Failed', errorMessage);
             Sentry.captureException(error);
         } finally {
